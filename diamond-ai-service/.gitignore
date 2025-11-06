@@ -1,0 +1,6 @@
+# Ignore the large, generated model file
+diamond_model.pkl
+
+# Ignore Python's cache files
+__pycache__/
+*.pyc
