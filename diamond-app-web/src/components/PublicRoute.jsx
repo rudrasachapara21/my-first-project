@@ -1,29 +1,40 @@
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
-import { jwtDecode } from 'jwt-decode';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import FullPageLoader from './FullPageLoader';
 
-const PublicRoute = () => {
-  const token = localStorage.getItem('token');
+/**
+ * A component that protects public-only routes (like the login page).
+ * If a user is already logged in, it redirects them to their specific dashboard.
+ *
+ * @param {object} props
+ * @param {React.ReactNode} props.children - The public component to render (e.g., Login page).
+ */
+const PublicRoute = ({ children }) => {
+  const { user, token, isLoading } = useAuth();
 
-  if (token) {
-    try {
-      const decodedToken = jwtDecode(token);
-      const userRole = decodedToken.role;
-
-      if (userRole === 'broker') {
-        return <Navigate to="/broker-home" replace />;
-      } else if (userRole === 'trader') {
-        return <Navigate to="/trader-home" replace />;
-      }
-    } catch (error) {
-      console.error("Invalid token, clearing storage:", error);
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      return <Outlet />;
-    }
+  // 1. Wait for the AuthContext to finish its initial loading.
+  if (isLoading) {
+    return <FullPageLoader />;
   }
 
-  return <Outlet />;
+  // 2. If the user is logged in, redirect them away from the public route.
+  if (token && user) {
+    // --- LOGIC FIX ---
+    // This now checks the user's role and redirects to the correct dashboard.
+    let targetPath = '/'; // Default fallback
+    if (user.role === 'admin') {
+      targetPath = '/admin';
+    } else if (user.role === 'trader') {
+      targetPath = '/trader-home';
+    } else if (user.role === 'broker') {
+      targetPath = '/broker-home';
+    }
+    return <Navigate to={targetPath} replace />;
+  }
+
+  // 3. If not loading and not logged in, render the public page (e.g., Login).
+  return children;
 };
 
 export default PublicRoute;

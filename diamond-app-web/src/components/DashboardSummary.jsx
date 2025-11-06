@@ -1,66 +1,61 @@
 import React from 'react';
 import styled from 'styled-components';
-import { PiBinoculars, PiHandWaving, PiStorefront } from "react-icons/pi";
+import { PiBinoculars, PiHandWaving, PiStorefront, PiSealCheckFill } from "react-icons/pi";
+import DashboardSummaryCard from './DashboardSummaryCard';
 
 const SummaryContainer = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
-  padding: 0 1.5rem 2rem 1.5rem;
-`;
-const StatCard = styled.div`
-  background: ${props => props.theme.bgSecondary};
-  padding: 1rem;
-  border-radius: 12px;
-  text-align: center;
-  border: 1px solid ${props => props.theme.borderColor};
-  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-`;
-const StatIcon = styled.div`
-  font-size: 1.8rem;
-  color: ${props => props.theme.accentPrimary};
-  margin-bottom: 0.5rem;
-`;
-const StatValue = styled.p`
-  font-family: 'Clash Display', sans-serif;
-  font-size: 2rem;
-  font-weight: 600;
-  color: ${props => props.theme.textPrimary};
-  margin: 0;
-  line-height: 1;
-`;
-const StatLabel = styled.p`
-  color: ${props => props.theme.textSecondary};
-  margin: 0.25rem 0 0 0;
-  font-size: 0.8rem;
-  font-weight: 500;
+  padding: 1.5rem;
 `;
 
-function DashboardSummary({ userType }) {
-  const traderStats = [
-    { value: 5, label: 'Active Demands', icon: <PiBinoculars /> },
-    { value: 3, label: 'New Interests', icon: <PiHandWaving /> }
-  ];
-  const brokerStats = [
-    { value: 8, label: 'New Demands Today', icon: <PiStorefront /> },
-    { value: 12, label: 'Hands Raised', icon: <PiHandWaving /> }
-  ];
-  const stats = userType === 'trader' ? traderStats : brokerStats;
+function DashboardSummary({ stats }) {
+  const getIcon = (label) => {
+    if (label.includes('Demand')) return <PiStorefront />;
+    if (label.includes('Raised')) return <PiHandWaving />;
+    if (label.includes('Interests')) return <PiHandWaving />;
+    if (label.includes('Active')) return <PiBinoculars />;
+    if (label.includes('Reputation')) return <PiSealCheckFill />;
+    return null;
+  };
+
+  if (!stats) {
+    const statsArray = [1, 2, 3]; // Mock array for loading state
+    const totalStats = statsArray.length;
+    return (
+      <SummaryContainer>
+        {statsArray.map((item, index) => {
+          const isLastItem = index === totalStats - 1;
+          const isOddTotal = totalStats % 2 !== 0;
+          return <DashboardSummaryCard key={index} isLoading={true} isFullWidth={isLastItem && isOddTotal} />
+        })}
+      </SummaryContainer>
+    );
+  }
+
+  const statsArray = Object.values(stats);
+  const totalStats = statsArray.length;
 
   return (
     <SummaryContainer>
-      {stats.map((stat, index) => (
-        <StatCard key={index}>
-          <StatIcon>{stat.icon}</StatIcon>
-          <StatValue>{stat.value}</StatValue>
-          <StatLabel>{stat.label}</StatLabel>
-        </StatCard>
-      ))}
+      {statsArray.map((stat, index) => {
+        // --- UI FIX: Logic to determine if the card should be full-width ---
+        const isLastItem = index === totalStats - 1;
+        const isOddTotal = totalStats % 2 !== 0;
+
+        return (
+          <DashboardSummaryCard 
+            key={index}
+            icon={getIcon(stat.label)}
+            value={stat.value}
+            label={stat.label}
+            isFullWidth={isLastItem && isOddTotal} // Pass the prop
+          />
+        );
+      })}
     </SummaryContainer>
   );
 }
+
 export default DashboardSummary;

@@ -1,19 +1,8 @@
-// services/pricingService.js
+// This file's logic has been migrated to the new Python AI service
+// (diamond-ai-service) to support machine learning models.
 
-const calculatePrice = (diamondDetails) => {
-  const { carat, color, clarity } = diamondDetails;
+// You can delete the contents of this file.
+// We are leaving the empty export so the 'require' in pricingController.js
+// doesn't crash (though we've removed that 'require' in the new controller).
 
-  let estimatedPrice = carat * 5000;
-
-  const colorMultipliers = { 'D': 1.5, 'E': 1.4, 'F': 1.3, 'G': 1.2, 'H': 1.1, 'I': 1.0, 'J': 0.9 };
-  estimatedPrice *= colorMultipliers[color.toUpperCase()] || 1;
-
-  const clarityMultipliers = { 'IF': 1.5, 'VVS1': 1.4, 'VVS2': 1.3, 'VS1': 1.2, 'VS2': 1.1, 'SI1': 1.0, 'SI2': 0.9, 'I1': 0.8 };
-  estimatedPrice *= clarityMultipliers[clarity.toUpperCase()] || 1;
-
-  return parseFloat(estimatedPrice.toFixed(2));
-};
-
-module.exports = {
-  calculatePrice,
-};
+module.exports = {};

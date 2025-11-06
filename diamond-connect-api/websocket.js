@@ -1,76 +1,76 @@
-// websocket.js
-const WebSocket = require('ws');
-const db = require('./db'); // Your database connection
+const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
-const url = require('url');
+const db = require('./db');
 
-// This will store active connections, mapping a userId to their WebSocket connection
-const clients = new Map();
+function init(httpServer) {
+    const io = new Server(httpServer, {
+        cors: {
+            // --- THIS IS THE CORRECTED LINE ---
+            origin: process.env.CORS_ORIGIN, 
+            methods: ["GET", "POST"]
+        }
+    });
 
-function initializeWebSocket(server) {
-    const wss = new WebSocket.Server({ server });
-
-    wss.on('connection', async (ws, req) => {
-        // Extract token from the connection URL, e.g., ws://localhost:5001?token=...
-        const token = url.parse(req.url, true).query.token;
-
+    io.use((socket, next) => {
+        const token = socket.handshake.auth.token || socket.handshake.query.token;
         if (!token) {
-            console.log("WebSocket connection rejected: No token provided.");
-            ws.close();
-            return;
+            return next(new Error('Authentication error: Token not provided.'));
         }
-
-        let userId;
         try {
-            // Verify the token to identify the user
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            userId = decoded.userId;
-            
-            // Store the user's connection
-            clients.set(userId, ws);
-            console.log(`WebSocket client connected: User ${userId}`);
-
-        } catch (error) {
-            console.log("WebSocket connection rejected: Invalid token.");
-            ws.close();
-            return;
+            socket.user = { user_id: decoded.user_id, role: decoded.role };
+            next();
+        } catch (err) {
+            return next(new Error('Authentication error: Invalid token.'));
         }
+    });
 
-        ws.on('message', async (message) => {
+    io.on('connection', (socket) => {
+        console.log(`[Socket.IO] Client connected: User ${socket.user.user_id}`);
+        socket.join(socket.user.user_id.toString());
+
+        socket.on('SEND_MESSAGE', async (data, callback) => {
             try {
-                const data = JSON.parse(message);
-                const { conversationId, message_content } = data;
-                
-                // 1. Save the new message to the database
-                const messageQuery = 'INSERT INTO messages (conversation_id, sender_id, message_content) VALUES ($1, $2, $3) RETURNING *';
-                const messageResult = await db.query(messageQuery, [conversationId, userId, message_content]);
+                if (!data.conversationId || !data.content) {
+                    return callback({ status: 'error', message: 'Invalid message format.' });
+                }
+                const senderId = socket.user.user_id;
+                const messageQuery = `
+                    INSERT INTO messages (conversation_id, sender_id, content)
+                    VALUES ($1, $2, $3) RETURNING *
+                `;
+                const messageResult = await db.query(messageQuery, [data.conversationId, senderId, data.content]);
                 const newMessage = messageResult.rows[0];
+                
+                await db.query(
+                    'UPDATE conversations SET last_message_at = $1 WHERE conversation_id = $2',
+                    [newMessage.sent_at, data.conversationId]
+                );
 
-                // 2. Find the recipient(s) of the message
-                const participantsQuery = 'SELECT user_id FROM conversation_participants WHERE conversation_id = $1 AND user_id != $2';
-                const participantsResult = await db.query(participantsQuery, [conversationId, userId]);
+                const participantsQuery = 'SELECT user_id FROM conversation_participants WHERE conversation_id = $1';
+                const participantsResult = await db.query(participantsQuery, [data.conversationId]);
 
-                // 3. Broadcast the message to the recipient(s) if they are online
-                participantsResult.rows.forEach(participant => {
-                    const recipientSocket = clients.get(participant.user_id);
-                    if (recipientSocket && recipientSocket.readyState === WebSocket.OPEN) {
-                        recipientSocket.send(JSON.stringify(newMessage));
-                    }
+                participantsResult.rows.forEach(({ user_id }) => {
+                    io.to(user_id.toString()).emit('NEW_MESSAGE', {
+                        conversationId: data.conversationId,
+                        message: newMessage,
+                    });
                 });
 
+                if (callback) callback({ status: 'ok', sentMessage: newMessage });
             } catch (error) {
-                console.error("Error processing WebSocket message:", error);
+                console.error("Error in 'SEND_MESSAGE' event:", error);
+                if (callback) callback({ status: 'error', message: 'Server could not process the message.' });
             }
         });
 
-        ws.on('close', () => {
-            // Remove the client from our map when they disconnect
-            clients.delete(userId);
-            console.log(`WebSocket client disconnected: User ${userId}`);
+        socket.on('disconnect', () => {
+            console.log(`[Socket.IO] Client disconnected: User ${socket.user.user_id}`);
         });
     });
 
-    console.log('WebSocket server initialized.');
+    console.log('Socket.IO server initialized.');
+    return io;
 }
 
-module.exports = { initializeWebSocket };
+module.exports = { init };

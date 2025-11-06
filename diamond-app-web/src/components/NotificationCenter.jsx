@@ -1,67 +1,125 @@
 import React from 'react';
 import styled from 'styled-components';
-import EmptyState from './EmptyState';
-import { PiBell } from 'react-icons/pi';
+import { useNavigate } from 'react-router-dom';
+import { useNotifications } from '../context/NotificationContext';
 
-const PanelContainer = styled.div`
+const CenterWrapper = styled.div`
   position: absolute;
-  top: 55px;
-  /* FIX: Changed from 'right: 0'. 
-    A negative value pushes the panel further to the right, clearing the
-    user profile icon and aligning it correctly on the screen.
-  */
-  right: -52px;
+  top: 100%;
+  
+  /* --- THE FIX: Set 'right' to 0 to align with the new parent anchor --- */
+  right: 0; 
+
   width: 350px;
-  max-width: 90vw;
-  background: ${props => props.theme.bgSecondary};
-  border-radius: 12px;
+  max-width: 90vw; /* Still keeps it from being too wide on extra small screens */
+  max-height: 400px;
+  background-color: ${props => props.theme.bgSecondary}; 
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   border: 1px solid ${props => props.theme.borderColor};
-  box-shadow: 0 5px 25px rgba(0,0,0,0.1);
-  z-index: 100;
+  margin-top: 15px; 
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
 `;
-const PanelHeader = styled.div`
+
+const Header = styled.div`
   padding: 1rem;
+  font-weight: bold;
   border-bottom: 1px solid ${props => props.theme.borderColor};
-  font-family: 'Clash Display', sans-serif;
-  font-size: 1.2rem;
-  font-weight: 500;
-  color: ${props => props.theme.textPrimary};
 `;
+
 const NotificationList = styled.ul`
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 400px;
   overflow-y: auto;
 `;
+
 const NotificationItem = styled.li`
   padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  cursor: pointer;
   border-bottom: 1px solid ${props => props.theme.borderColor};
-  color: ${props => props.theme.textSecondary};
-  font-size: 0.9rem;
-  &:last-child { border-bottom: none; }
+  &:last-child {
+    border-bottom: none;
+  }
+  &:hover {
+    background-color: ${props => props.theme.backgroundHover};
+  }
 `;
 
-function NotificationCenter({ notifications }) {
+const NotificationMessage = styled.span`
+  flex: 1;
+  line-height: 1.4;
+  word-break: break-word;
+`;
+
+const UnreadDot = styled.div`
+  width: 8px;
+  height: 8px;
+  background-color: ${props => props.theme.accentPrimary};
+  border-radius: 50%;
+  flex-shrink: 0;
+`;
+
+const DismissButton = styled.button`
+  background: transparent;
+  border: none;
+  color: ${props => props.theme.textSecondary};
+  font-weight: bold;
+  cursor: pointer;
+  padding: 5px;
+  margin-left: auto;
+  &:hover {
+    color: ${props => props.theme.accentPrimary};
+  }
+`;
+
+const EmptyState = styled.div`
+  padding: 2rem;
+  text-align: center;
+  color: ${props => props.theme.textSecondary};
+`;
+
+const NotificationCenter = ({ onClose }) => {
+  const { notifications, isLoading, dismissNotification } = useNotifications();
+  const navigate = useNavigate();
+
+  const handleItemClick = (notification) => {
+    if (notification.link_url) {
+      navigate(notification.link_url);
+    }
+    onClose(); 
+  };
+  
+  const handleDismiss = (e, notificationId) => {
+    e.stopPropagation(); 
+    dismissNotification(notificationId); 
+  };
+
   return (
-    <PanelContainer>
-      <PanelHeader>Notifications</PanelHeader>
+    <CenterWrapper onClick={(e) => e.stopPropagation()}>
+      <Header>Notifications</Header>
       <NotificationList>
-        {notifications.length > 0 ? (
-          notifications.map(notif => (
-            <NotificationItem key={notif.id}>{notif.message}</NotificationItem>
-          ))
+        {isLoading ? (
+          <EmptyState>Loading...</EmptyState>
+        ) : notifications.length === 0 ? (
+          <EmptyState>You have no notifications.</EmptyState>
         ) : (
-          <div style={{padding: '0.5rem'}}>
-            <EmptyState 
-                icon={PiBell}
-                title="No New Notifications" 
-                message="Check back later for new updates." 
-            />
-          </div>
+          notifications.map((n) => (
+            <NotificationItem key={n.id} onClick={() => handleItemClick(n)}>
+              {!n.is_read && <UnreadDot />}
+              <NotificationMessage>{n.message}</NotificationMessage>
+              <DismissButton onClick={(e) => handleDismiss(e, n.id)}>X</DismissButton>
+            </NotificationItem>
+          ))
         )}
       </NotificationList>
-    </PanelContainer>
+    </CenterWrapper>
   );
-}
+};
+
 export default NotificationCenter;

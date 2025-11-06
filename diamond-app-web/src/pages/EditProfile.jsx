@@ -1,61 +1,46 @@
-// src/pages/EditProfile.jsx
-
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../api/axiosConfig';
 import PageHeader from '../components/PageHeader';
+import { useAuth } from '../context/AuthContext';
+import { PiSealCheckFill } from 'react-icons/pi';
 
-// ... All styled components are the same ...
-const ProgressWrapper = styled.div` padding: 0 1.5rem 2rem 1.5rem; `;
-const ProgressLabel = styled.p` font-size: 0.9rem; color: ${props => props.theme.textSecondary}; margin: 0 0 0.5rem 0; font-weight: 500; `;
-const ProgressBarContainer = styled.div` width: 100%; height: 10px; background-color: ${props => props.theme.borderColor}; border-radius: 10px; overflow: hidden; `;
-const ProgressBar = styled.div` width: ${props => props.$progress}%; height: 100%; background-color: ${props => props.theme.accentPrimary}; border-radius: 10px; transition: width 0.5s ease-in-out; `;
 const Container = styled.div``;
 const ProfilePhotoSection = styled.div` display: flex; flex-direction: column; align-items: center; padding: 2rem 1.5rem; `;
 const Avatar = styled.img` width: 100px; height: 100px; border-radius: 50%; background-color: #A5B4FC; border: 3px solid ${props => props.theme.accentPrimary}; margin-bottom: 1rem; object-fit: cover;`;
 const ChangePhotoButton = styled.label` background: transparent; border: 2px solid ${props => props.theme.accentPrimary}; color: ${props => props.theme.accentPrimary}; padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 700; cursor: pointer; `;
 const HiddenFileInput = styled.input` display: none; `;
-const FormContainer = styled.form` padding: 0 1.5rem; `;
+const FormContainer = styled.form` padding: 0 1.5rem 2rem; `;
 const InputGroup = styled.div` margin-bottom: 1.5rem; `;
 const InputLabel = styled.label` display: block; margin-bottom: 0.5rem; color: ${props => props.theme.textSecondary}; font-size: 0.9rem; font-weight: 700; `;
 const InputField = styled.input` width: 100%; padding: 1rem; background-color: ${props => props.theme.bgSecondary}; border: 2px solid ${props => props.theme.borderColor}; border-radius: 12px; color: ${props => props.theme.textPrimary}; font-size: 1rem; box-sizing: border-box; &:focus { outline: none; border-color: ${props => props.theme.accentPrimary}; } `;
 const TextAreaField = styled.textarea` width: 100%; padding: 1rem; background-color: ${props => props.theme.bgSecondary}; border: 2px solid ${props => props.theme.borderColor}; border-radius: 12px; color: ${props => props.theme.textPrimary}; font-size: 1rem; box-sizing: border-box; font-family: 'Inter', sans-serif; min-height: 80px; &:focus { outline: none; border-color: ${props => props.theme.accentPrimary}; } `;
-const CtaButton = styled.button` width: 100%; padding: 1rem; border: none; border-radius: 12px; background: ${props => props.theme.textPrimary}; color: ${props => props.theme.bgSecondary}; font-family: 'Clash Display', sans-serif; font-size: 1.2rem; font-weight: 600; cursor: pointer; margin-top: 1rem; &:disabled { background-color: #ccc; } `;
+const CtaButton = styled.button` width: 100%; padding: 1rem; border: none; border-radius: 12px; background: ${props => props.theme.accentPrimary}; color: #FFFFFF; font-family: 'Clash Display', sans-serif; font-size: 1.2rem; font-weight: 600; cursor: pointer; margin-top: 1rem; &:disabled { background-color: #ccc; } `;
 const SuccessMessage = styled.p` color: #22c55e; text-align: center; font-weight: 500; `;
-
+const ReadOnlyField = styled.div` width: 100%; padding: 1rem; background-color: ${props => props.theme.bgPrimary}; border: 2px solid ${props => props.theme.borderColor}; border-radius: 12px; color: ${props => props.theme.textSecondary}; font-size: 1rem; box-sizing: border-box; display: flex; align-items: center; gap: 0.5rem; `;
 
 function EditProfile() {
-  const navigate = useNavigate();
-  const [profile, setProfile] = useState({});
+  const { user } = useAuth();
+  const [profile, setProfile] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
-  const [photoPreview, setPhotoPreview] = useState(''); // For displaying the new photo
-  const [progress, setProgress] = useState(0);
+  const [photoPreview, setPhotoPreview] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [success, setSuccess] = useState('');
-
-  const calculateProgress = useCallback((data) => {
-    // ... same as before
-  }, []);
+  
+  const API_ROOT_URL = import.meta.env.VITE_API_URL.replace('/api', '');
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) { navigate('/'); return; }
+    if (!user) return;
     const fetchProfile = async () => {
+      setIsLoading(true);
       try {
-        const response = await axios.get('http://localhost:5001/api/profile', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await apiClient.get('/api/profile');
         setProfile(response.data);
-        calculateProgress(response.data);
-      } catch (error) {
-        console.error("Failed to fetch profile", error);
-      } finally {
-        setIsLoading(false);
-      }
+      } catch (error) { console.error("Failed to fetch profile", error); }
+      finally { setIsLoading(false); }
     };
     fetchProfile();
-  }, [navigate, calculateProgress]);
+  }, [user]);
 
   const handleChange = (e) => {
     setProfile(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -66,9 +51,7 @@ function EditProfile() {
     if (file) {
       setPhotoFile(file);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result); // Set the preview URL
-      };
+      reader.onloadend = () => { setPhotoPreview(reader.result); };
       reader.readAsDataURL(file);
     }
   };
@@ -77,35 +60,25 @@ function EditProfile() {
     e.preventDefault();
     setIsLoading(true);
     setSuccess('');
-    const token = localStorage.getItem('token');
-    
     const formData = new FormData();
     
-    // THIS IS THE FIX: We create a copy of the profile but remove the photo_url
-    // so the long preview string is NOT sent.
-    const profileDataToSend = { ...profile };
-    delete profileDataToSend.photo_url;
-
-    // Append all text fields
-    Object.keys(profileDataToSend).forEach(key => {
-        if(profileDataToSend[key] !== null) {
-            formData.append(key, profileDataToSend[key]);
+    // This generic loop will automatically include the new 'office_hours' field
+    Object.keys(profile).forEach(key => {
+        if (key !== 'user_id' && key !== 'email' && key !== 'role' && key !== 'profile_photo_url' && key !== 'reputation_points') {
+            formData.append(key, profile[key] || '');
         }
     });
-    // Append the new photo file ONLY if one was selected
+
     if (photoFile) {
-        formData.append('photo', photoFile);
+        formData.append('profilePhoto', photoFile);
     }
 
     try {
-      const response = await axios.put('http://localhost:5001/api/profile', formData, {
-        headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-        }
+      const response = await apiClient.put('/api/profile', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
       setSuccess(response.data.message);
-      // Optional: Update profile state with new URL from server if needed
+      // Optionally, refetch user data to update context if needed
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to update profile.');
     } finally {
@@ -113,34 +86,44 @@ function EditProfile() {
     }
   };
   
-  // Determine which image to show: the new preview or the existing one from the database
-  const displayImage = photoPreview || (profile.photo_url ? `http://localhost:5001/${profile.photo_url}` : 'https://placehold.co/100');
+  if (isLoading || !profile) return <p>Loading...</p>;
+
+  const displayImage = photoPreview || (profile.profile_photo_url ? `${API_ROOT_URL}${profile.profile_photo_url}` : `https://ui-avatars.com/api/?name=${profile.full_name.replace(' ', '+')}`);
 
   return (
     <Container>
       <PageHeader title="Edit Profile" />
       <ProfilePhotoSection>
-        <Avatar src={displayImage} />
+        <Avatar src={displayImage} alt="Profile" />
         <ChangePhotoButton htmlFor="photo-upload">Change Photo</ChangePhotoButton>
         <HiddenFileInput id="photo-upload" type="file" accept="image/*" onChange={handleFileChange} />
       </ProfilePhotoSection>
-      <ProgressWrapper>
-        <ProgressLabel>Profile Completion: {Math.round(progress)}%</ProgressLabel>
-        <ProgressBarContainer>
-            <ProgressBar $progress={progress} />
-        </ProgressBarContainer>
-      </ProgressWrapper>
       <FormContainer onSubmit={handleSubmit}>
-        {/* All your InputGroups are the same as before */}
+        {user.role === 'broker' && (
+          <InputGroup>
+            <InputLabel>Reputation Points</InputLabel>
+            <ReadOnlyField><PiSealCheckFill color="#22c55e" /> {profile.reputation_points}</ReadOnlyField>
+          </InputGroup>
+        )}
         <InputGroup><InputLabel>Full Name</InputLabel><InputField name="full_name" value={profile.full_name || ''} onChange={handleChange} /></InputGroup>
         <InputGroup><InputLabel>Office Name</InputLabel><InputField name="office_name" value={profile.office_name || ''} onChange={handleChange} /></InputGroup>
-        <InputGroup><InputLabel>Phone Number</InputLabel><InputField name="phone_number" value={profile.phone_number || ''} onChange={handleChange} /></InputGroup>
+        <InputGroup><InputLabel>Phone Number</InputLabel><InputField type="tel" name="phone_number" value={profile.phone_number || ''} onChange={handleChange} /></InputGroup>
+        
+        {/* --- THE FIX: Added the new "Office Hours" input field --- */}
+        <InputGroup>
+          <InputLabel>Office Hours</InputLabel>
+          <InputField 
+            name="office_hours" 
+            placeholder="e.g., 10:00 AM - 6:00 PM"
+            value={profile.office_hours || ''} 
+            onChange={handleChange} 
+          />
+        </InputGroup>
+        
         <InputGroup><InputLabel>Office Address</InputLabel><TextAreaField name="office_address" value={profile.office_address || ''} onChange={handleChange} /></InputGroup>
-        <InputGroup><InputLabel>GST Number</InputLabel><InputField name="gst_number" value={profile.gst_number || ''} onChange={handleChange} placeholder="e.g., 22AAAAA0000A1Z5" /></InputGroup>
-
-        <CtaButton type="submit" disabled={isLoading}>
-            {isLoading ? 'Saving...' : 'Save Changes'}
-        </CtaButton>
+        <InputGroup><InputLabel>GST Number</InputLabel><InputField name="gst_number" value={profile.gst_number || ''} onChange={handleChange} /></InputGroup>
+        
+        <CtaButton type="submit" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Changes'}</CtaButton>
         {success && <SuccessMessage>{success}</SuccessMessage>}
       </FormContainer>
     </Container>

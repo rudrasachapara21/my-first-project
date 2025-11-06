@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import PageHeader from '../components/PageHeader';
+import apiClient from '../api/axiosConfig';
 
 const Container = styled.div``;
-
 const SettingsList = styled.div`
   padding: 0 1.5rem;
 `;
@@ -74,10 +74,41 @@ function Notifications() {
     handRaises: true,
     newsUpdates: false,
   });
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleToggle = (key) => {
-    setToggles(prev => ({ ...prev, [key]: !prev[key] }));
+  useEffect(() => {
+    const fetchPreferences = async () => {
+      try {
+        // ## CHANGE: Using apiClient and added /api prefix ##
+        const { data } = await apiClient.get('/api/users/me/preferences');
+        setToggles(data);
+      } catch (error) {
+        console.error("Failed to fetch preferences:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPreferences();
+  }, []);
+  
+  const handleToggle = async (key) => {
+    // Optimistically update UI
+    const newToggles = { ...toggles, [key]: !toggles[key] };
+    setToggles(newToggles); 
+
+    try {
+      // ## CHANGE: Using apiClient and added /api prefix ##
+      await apiClient.put('/api/users/me/preferences', newToggles);
+    } catch (error) {
+      console.error("Failed to save preferences:", error);
+      // Revert UI on error
+      setToggles(toggles); 
+    }
   };
+
+  if (isLoading) {
+    return <div>Loading settings...</div>;
+  }
 
   return (
     <Container>

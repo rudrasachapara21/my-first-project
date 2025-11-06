@@ -1,128 +1,164 @@
-// controllers/listingController.js
-const db = require('../db.js');
+const db = require('../db');
 
-// The logic for the POST /api/listings endpoint with file upload
-exports.createListing = async (req, res) => {
-  // Text fields are in req.body
-  const { carat, clarity, price, color, shape, cut } = req.body;
-  // The file info is in req.file
-  const imagePath = req.file ? req.file.path : null; 
-  const traderId = req.user.userId;
+exports.createListing = async (req, res, next) => {
+    const { price, diamond_details } = req.body;
+    const traderId = req.user.user_id;
+    const imageUrls = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
 
-  if (!carat || !clarity || !price || !imagePath) {
-    return res.status(400).json({ message: 'All fields, including image, are required' });
-  }
+    try {
+        if (!diamond_details) {
+            return res.status(400).json({ message: 'Details are required.' });
+        }
+        
+        const query = `
+            INSERT INTO listings (trader_id, diamond_details, price, image_urls)
+            VALUES ($1, $2, $3, $4) RETURNING *
+        `;
+        const values = [traderId, diamond_details, price, imageUrls];
+        const { rows } = await db.query(query, values);
 
-  try {
-    // Create the JSON object for diamond_details
-    const diamondDetails = { carat, clarity, color, shape, cut };
-
-    const newListingQuery = `
-      INSERT INTO listings (trader_id, diamond_details, price, image_url, status)
-      VALUES ($1, $2, $3, $4, 'available')
-      RETURNING *
-    `;
-    const values = [traderId, diamondDetails, price, imagePath];
-    const { rows } = await db.query(newListingQuery, values);
-
-    res.status(201).json({
-      message: 'Listing created successfully!',
-      listing: rows[0],
-    });
-
-  } catch (error) {
-    console.error('Create listing error:', error);
-    res.status(500).json({ message: 'Server error during listing creation' });
-  }
+        req.io.emit('new-listing', rows[0]);
+        
+        res.status(201).json({ message: 'Listing created successfully!', listing: rows[0] });
+    } catch (error) {
+        next(error);
+    }
 };
 
-// The logic for the GET /api/listings endpoint
-exports.getAllListings = async (req, res) => {
-  try {
-    const getAllListingsQuery = `
-      SELECT l.*, u.full_name as user_name
-      FROM listings l
-      JOIN users u ON l.trader_id = u.user_id
-      WHERE l.status = 'available'
-      ORDER BY l.created_at DESC
-    `;
-    const { rows } = await db.query(getAllListingsQuery);
-
-    res.status(200).json(rows);
-
-  } catch (error) {
-    console.error('Get all listings error:', error);
-    res.status(500).json({ message: 'Server error while fetching listings' });
-  }
+exports.getAllListings = async (req, res, next) => {
+    const userId = req.user.user_id;
+    try {
+        const query = `
+            SELECT l.*, u.full_name AS trader_name, u.office_name
+            FROM listings l
+            JOIN users u ON l.trader_id = u.user_id
+            WHERE l.status = 'available' AND l.trader_id != $1
+            ORDER BY l.created_at DESC
+        `;
+        const { rows } = await db.query(query, [userId]);
+        res.status(200).json(rows);
+    } catch (error) {
+        next(error);
+    }
 };
 
-// The logic for the POST /api/listings/:id/raise-hand endpoint
-exports.raiseHandOnListing = async (req, res) => {
-  const { id } = req.params;
-  const interestedUserId = req.user.userId;
-
-  try {
-    const listingQuery = 'SELECT * FROM listings WHERE listing_id = $1';
-    const listingResult = await db.query(listingQuery, [id]);
-    if (listingResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Listing not found' });
+exports.getMyListings = async (req, res, next) => {
+    const traderId = req.user.user_id;
+    try {
+        const query = 'SELECT * FROM listings WHERE trader_id = $1 ORDER BY created_at DESC';
+        const { rows } = await db.query(query, [traderId]);
+        res.status(200).json(rows);
+    } catch (error) {
+        next(error);
     }
-
-    if (listingResult.rows[0].trader_id === interestedUserId) {
-        return res.status(400).json({ message: 'You cannot raise a hand on your own listing' });
-    }
-
-    const raiseHandQuery = `
-      INSERT INTO listing_interests (listing_id, interested_user_id)
-      VALUES ($1, $2)
-      RETURNING *
-    `;
-    const { rows } = await db.query(raiseHandQuery, [id, interestedUserId]);
-
-    res.status(201).json({
-      message: 'Successfully raised hand on the listing!',
-      interest: rows[0],
-    });
-
-  } catch (error) {
-    if (error.code === '23505') { // unique_violation
-      return res.status(409).json({ message: 'You have already raised a hand on this listing' });
-    }
-    console.error('Raise hand on listing error:', error);
-    res.status(500).json({ message: 'Server error while raising hand on listing' });
-  }
 };
 
-// The logic for the GET /api/listings/:id/interests endpoint
-exports.getListingInterests = async (req, res) => {
-  const { id } = req.params;
-  const traderId = req.user.userId;
-
-  try {
-    const listingQuery = 'SELECT * FROM listings WHERE listing_id = $1';
-    const listingResult = await db.query(listingQuery, [id]);
-
-    if (listingResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Listing not found' });
+exports.getListingById = async (req, res, next) => {
+    const { id } = req.params;
+    try {
+        const query = `
+            SELECT l.*, u.full_name, u.office_name, u.phone_number, u.office_address, u.gst_number, u.profile_photo_url
+            FROM listings l
+            JOIN users u ON l.trader_id = u.user_id
+            WHERE l.listing_id = $1
+        `;
+        const { rows } = await db.query(query, [id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'Listing not found' });
+        }
+        res.status(200).json(rows[0]);
+    } catch (error) {
+        next(error);
     }
+};
 
-    const listing = listingResult.rows[0];
-    if (listing.trader_id !== traderId) {
-      return res.status(403).json({ message: 'Forbidden: You are not the owner of this listing' });
+exports.updateListing = async (req, res, next) => {
+    const { id } = req.params;
+    const { price, diamond_details } = req.body;
+    const traderId = req.user.user_id;
+
+    try {
+        // First, verify the user owns the listing
+        const ownerCheck = await db.query('SELECT trader_id FROM listings WHERE listing_id = $1', [id]);
+        if (ownerCheck.rows.length === 0 || ownerCheck.rows[0].trader_id !== traderId) {
+            return res.status(403).json({ message: 'Forbidden: You do not own this listing.' });
+        }
+
+        // If ownership is verified, update the listing
+        const updateQuery = `
+            UPDATE listings 
+            SET price = $1, diamond_details = $2 
+            WHERE listing_id = $3 AND trader_id = $4
+            RETURNING *
+        `;
+        const { rows } = await db.query(updateQuery, [price, diamond_details, id, traderId]);
+
+        res.status(200).json({ message: 'Listing updated successfully!', listing: rows[0] });
+    } catch (error) {
+        next(error);
     }
+};
 
-    const interestsQuery = `
-      SELECT u.user_id, u.full_name, u.email, u.phone_number, u.office_name
-      FROM users u
-      JOIN listing_interests li ON u.user_id = li.interested_user_id
-      WHERE li.listing_id = $1
-    `;
-    const { rows } = await db.query(interestsQuery, [id]);
+exports.deleteListing = async (req, res, next) => {
+    const { id } = req.params;
+    const traderId = req.user.user_id;
+    try {
+        const query = 'DELETE FROM listings WHERE listing_id = $1 AND trader_id = $2 RETURNING listing_id';
+        const { rows } = await db.query(query, [id, traderId]);
+        if (rows.length === 0) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        req.io.emit('listing-deleted', { listingId: id });
+        res.status(200).json({ message: 'Listing deleted successfully.' });
+    } catch (error) {
+        next(error);
+    }
+};
 
-    res.status(200).json(rows);
+exports.toggleListingInterest = async (req, res, next) => {
+    const { id: listingId } = req.params;
+    const interestedUserId = req.user.user_id;
+    try {
+        const existingQuery = 'SELECT * FROM listing_interests WHERE listing_id = $1 AND interested_user_id = $2';
+        const { rows: existing } = await db.query(existingQuery, [listingId, interestedUserId]);
+        if (existing.length > 0) {
+            await db.query('DELETE FROM listing_interests WHERE listing_interest_id = $1', [existing[0].listing_interest_id]);
+            res.status(200).json({ message: 'Interest removed' });
+        } else {
+            await db.query('INSERT INTO listing_interests (listing_id, interested_user_id) VALUES ($1, $2)', [listingId, interestedUserId]);
+            const sellerQuery = 'SELECT trader_id FROM listings WHERE listing_id = $1';
+            const { rows: listingRows } = await db.query(sellerQuery, [listingId]);
+            if (listingRows.length > 0) {
+                req.io.emit('listing-interest-received', { listingId, interestedUserId, sellerId: listingRows[0].trader_id });
+            }
+            res.status(201).json({ message: 'Interest registered successfully' });
+        }
+    } catch (error) {
+        next(error);
+    }
+};
 
-  } catch (error) {
-    console.error('Get listing interests error:', error);
-    res.status(500).json({ message: 'Server error while fetching interests' });
-  }
+exports.getListingOffers = async (req, res, next) => {
+    const { listingId } = req.params;
+    const userId = req.user.user_id;
+
+    try {
+        const ownerCheck = await db.query('SELECT trader_id FROM listings WHERE listing_id = $1', [listingId]);
+        if (ownerCheck.rows.length === 0 || ownerCheck.rows[0].trader_id !== userId) {
+            return res.status(403).json({ message: 'Forbidden: You do not own this listing.' });
+        }
+
+        const offersQuery = `
+            SELECT o.*, u.full_name as buyer_name
+            FROM offers o
+            JOIN users u ON o.buyer_id = u.user_id
+            WHERE o.listing_id = $1
+            ORDER BY o.created_at DESC
+        `;
+        const { rows } = await db.query(offersQuery, [listingId]);
+        
+        res.status(200).json(rows);
+    } catch (error) {
+        next(error);
+    }
 };

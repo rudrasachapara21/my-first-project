@@ -1,11 +1,9 @@
-// src/pages/DemandInterestsPage.jsx
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../api/axiosConfig'; // 1. Import our new central API client
 import styled from 'styled-components';
 import PageHeader from '../components/PageHeader';
-import { SkeletonDemandCard } from '../components/SkeletonCard'; // Re-using skeleton for loading
+import { SkeletonDemandCard } from '../components/SkeletonCard';
 
 const Container = styled.div``;
 const BrokerList = styled.div`
@@ -30,21 +28,19 @@ function DemandInterestsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/');
-      return;
-    }
-
     const fetchInterests = async () => {
       try {
-        const response = await axios.get(`http://localhost:5001/api/demands/${demandId}/interests`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        // 2. Use apiClient and a relative path. No manual headers needed!
+        const response = await apiClient.get(`/api/demands/${demandId}/interests`);
         setBrokers(response.data);
       } catch (error) {
         console.error("Failed to fetch interests:", error);
-        alert(error.response?.data?.message || "Could not load interests.");
+        // A 401 error from the backend will be caught here, we can handle it
+        if (error.response?.status === 401) {
+            navigate('/'); // e.g., redirect to login if not authorized
+        } else {
+            alert(error.response?.data?.message || "Could not load interests.");
+        }
       } finally {
         setIsLoading(false);
       }

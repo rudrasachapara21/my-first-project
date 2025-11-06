@@ -1,46 +1,83 @@
-// middleware/authMiddleware.js
 const jwt = require('jsonwebtoken');
-const db = require('../db.js');
+const db = require('../db');
 
-exports.verifyToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+// It's recommended to set a strong, unique secret in your .env file
+const JWT_SECRET = process.env.JWT_SECRET;
 
-    if (!token) {
-        return res.status(403).json({ message: 'A token is required for authentication' });
-    }
-
+/**
+ * Middleware to verify the JWT from the Authorization header.
+ * If the token is valid, it fetches the user from the database
+ * and attaches them to the request object as `req.user`.
+ * @param {object} req - The Express request object.
+ * @param {object} res - The Express response object.
+ * @param {function} next - The Express next middleware function.
+ */
+async function verifyToken(req, res, next) {
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded;
-        console.log('Decoded user from token:', req.user); 
+        const authHeader = req.headers.authorization || req.headers.Authorization;
+
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ message: 'Authorization token is required.' });
+        }
+
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+
+        // Fetch the user from the database to ensure they still exist
+        const query = 'SELECT user_id, full_name, email, role FROM users WHERE user_id = $1';
+        const { rows } = await db.query(query, [decoded.user_id]);
+
+        if (rows.length === 0) {
+            return res.status(401).json({ message: 'User associated with this token not found.' });
+        }
+
+        // Attach user information to the request object for use in subsequent routes
+        req.user = rows[0];
+        next();
+
     } catch (err) {
-        return res.status(401).json({ message: 'Invalid Token' });
+        console.error('Authentication error:', err.message);
+        // Catches errors from jwt.verify (e.g., expired token, invalid signature)
+        return res.status(401).json({ message: 'Invalid or expired token.' });
     }
-    return next();
-};
+}
 
-exports.isTrader = async (req, res, next) => {
-    console.log(`Checking isTrader. User role is: ${req.user.role}`);
-    if (req.user.role === 'trader') {
-        return next();
+/**
+ * Middleware to check if the authenticated user has the 'admin' role.
+ * Must be used after verifyToken.
+ */
+function isAdmin(req, res, next) {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Forbidden. Admin access is required.' });
     }
-    return res.status(403).json({ message: 'Access denied. Traders only.' });
-};
+    next();
+}
 
-exports.isBroker = async (req, res, next) => {
-    console.log(`Checking isBroker. User role is: ${req.user.role}`);
-    if (req.user.role === 'broker') {
-        return next();
+/**
+ * Middleware to check if the authenticated user has the 'trader' role.
+ * Must be used after verifyToken.
+ */
+function isTrader(req, res, next) {
+    if (req.user?.role !== 'trader') {
+        return res.status(403).json({ message: 'Forbidden. Trader access is required.' });
     }
-    return res.status(403).json({ message: 'Access denied. Brokers only.' });
-};
+    next();
+}
 
-// **** THIS IS THE MISSING FUNCTION ****
-exports.isAdmin = (req, res, next) => {
-    console.log(`Checking isAdmin. User role is: ${req.user.role}`);
-    if (req.user.role === 'admin') {
-        return next();
+/**
+ * Middleware to check if the authenticated user has the 'broker' role.
+ * Must be used after verifyToken.
+ */
+function isBroker(req, res, next) {
+    if (req.user?.role !== 'broker') {
+        return res.status(403).json({ message: 'Forbidden. Broker access is required.' });
     }
-    return res.status(403).json({ message: 'Access denied. Admins only.' });
+    next();
+}
+
+module.exports = {
+    verifyToken,
+    isAdmin,
+    isTrader,
+    isBroker,
 };

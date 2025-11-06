@@ -1,10 +1,10 @@
-// src/pages/admin/ManageNews.jsx
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+// ## FIX 1: Corrected the import path to go up two levels ##
+import apiClient from '../../api/axiosConfig';
+import { useOutletContext } from 'react-router-dom';
 
+// --- STYLED COMPONENTS (No changes needed) ---
 const Container = styled.div``;
 const Header = styled.div` display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; `;
 const Title = styled.h1` font-family: 'Clash Display', sans-serif; font-size: 2.5rem; color: #1e293b; `;
@@ -24,38 +24,15 @@ const Input = styled.input` width: 100%; padding: 0.8rem; margin-bottom: 1rem; b
 const TextArea = styled.textarea` width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem; min-height: 120px; resize: vertical; box-sizing: border-box; `;
 const ModalActions = styled.div` display: flex; justify-content: flex-end; gap: 1rem; `;
 
+
 function ManageNews() {
-  const navigate = useNavigate();
-  const [news, setNews] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { news, setNews } = useOutletContext();
   const [isModalOpen, setModalOpen] = useState(false);
   const [newArticle, setNewArticle] = useState({ title: '', content: '', image_url: '' });
-
-  const fetchNews = useCallback(async () => {
-    const token = localStorage.getItem('token');
-    if (!token) { navigate('/admin/login'); return; }
-    try {
-      setIsLoading(true);
-      const response = await axios.get('http://localhost:5001/api/news', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setNews(response.data);
-    } catch (error) {
-      console.error("Failed to fetch news:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [navigate]);
-
-  useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (user?.role !== 'admin') {
-      alert("Access Denied.");
-      navigate('/admin/login');
-    } else {
-      fetchNews();
-    }
-  }, [fetchNews, navigate]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // ## FIX 2: Added the missing API_URL constant for building image paths ##
+  const API_URL = import.meta.env.VITE_API_URL;
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -67,32 +44,35 @@ function ManageNews() {
         alert("Title and content are required.");
         return;
     }
-    const token = localStorage.getItem('token');
+    setIsSubmitting(true);
     try {
-      await axios.post('http://localhost:5001/api/news', newArticle, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await apiClient.post(`/api/news`, newArticle);
+      setNews(prevNews => [response.data, ...prevNews]);
       setModalOpen(false);
       setNewArticle({ title: '', content: '', image_url: '' });
-      fetchNews(); // Refresh the list
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to post article.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDeleteArticle = async (articleId) => {
     if (window.confirm('Are you sure you want to delete this article?')) {
-      const token = localStorage.getItem('token');
       try {
-        await axios.delete(`http://localhost:5001/api/news/${articleId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        fetchNews(); // Refresh the list
+        await apiClient.delete(`/api/news/${articleId}`);
+        setNews(prevNews => prevNews.filter(article => article.news_id !== articleId));
       } catch (error) {
         alert(error.response?.data?.message || 'Failed to delete article.');
       }
     }
   };
+  
+  const getImageUrl = (path) => {
+      if (!path) return 'https://placehold.co/80x50';
+      if (path.startsWith('http')) return path;
+      return `${API_URL}${path}`;
+  }
 
   return (
     <Container>
@@ -100,15 +80,16 @@ function ManageNews() {
         <Title>Manage News</Title>
         <AddButton onClick={() => setModalOpen(true)}>Add New Article</AddButton>
       </Header>
-      {isLoading ? <p>Loading news...</p> : news.length > 0 ? (
+      
+      {news && news.length > 0 ? (
         <Table>
           <Thead><Tr><Th>Image</Th><Th>Title</Th><Th>Date</Th><Th>Actions</Th></Tr></Thead>
           <tbody>
             {news.map(article => (
               <Tr key={article.news_id}>
-                <CardImage src={article.image_url} alt={article.title} />
+                <CardImage src={getImageUrl(article.image_url)} alt={article.title} />
                 <Td data-label="Image">
-                    {article.image_url ? <ImageThumbnail src={article.image_url} alt={article.title} /> : 'No Image'}
+                    <ImageThumbnail src={getImageUrl(article.image_url)} alt={article.title} />
                 </Td>
                 <Td data-label="Title">{article.title}</Td>
                 <Td data-label="Date">{new Date(article.created_at).toLocaleDateString()}</Td>
@@ -118,21 +99,21 @@ function ManageNews() {
           </tbody>
         </Table>
       ) : (
-        <EmptyState>
-          <h3>No News Articles Found</h3>
-          <p>Click "Add New Article" to get started.</p>
-        </EmptyState>
+        <EmptyState><h3>No News Articles Found</h3><p>Click "Add New Article" to get started.</p></EmptyState>
       )}
+
       {isModalOpen && (
         <ModalBackdrop>
           <ModalContent>
             <h2 style={{marginTop: 0}}>Add New Article</h2>
             <Input name="title" value={newArticle.title} onChange={handleInputChange} placeholder="Article Title" />
-            <Input name="image_url" value={newArticle.image_url} onChange={handleInputChange} placeholder="Image URL (e.g., https://...)" />
+            <Input name="image_url" value={newArticle.image_url} onChange={handleInputChange} placeholder="Image URL (e.g., /uploads/image.jpg or https://...)" />
             <TextArea name="content" value={newArticle.content} onChange={handleInputChange} placeholder="Article content..."/>
             <ModalActions>
-              <button onClick={() => setModalOpen(false)}>Cancel</button>
-              <AddButton onClick={handleAddArticle}>Save Article</AddButton>
+              <button onClick={() => setModalOpen(false)} disabled={isSubmitting}>Cancel</button>
+              <AddButton onClick={handleAddArticle} disabled={isSubmitting}>
+                {isSubmitting ? 'Saving...' : 'Save Article'}
+              </AddButton>
             </ModalActions>
           </ModalContent>
         </ModalBackdrop>
