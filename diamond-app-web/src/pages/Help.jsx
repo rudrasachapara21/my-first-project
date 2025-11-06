@@ -1,13 +1,9 @@
-// src/pages/Help.jsx
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import apiClient from '../api/axiosConfig';
 import PageHeader from '../components/PageHeader';
 import { PiCaretDown } from "react-icons/pi";
 
-// ... sampleFaqs and styled-components are the same ...
 const sampleFaqs = [
     {
         q: "How do I post a new demand?",
@@ -53,8 +49,8 @@ const TextArea = styled.textarea`
     &:focus { outline: none; border-color: ${props => props.theme.accentPrimary}; }
 `;
 const SubmitButton = styled.button`
-    padding: 1rem; border: none; border-radius: 12px; background: ${props => props.theme.textPrimary};
-    color: ${props => props.theme.bgSecondary}; font-family: 'Clash Display', sans-serif;
+    padding: 1rem; border: none; border-radius: 12px; background: ${props => props.theme.accentPrimary};
+    color: #FFFFFF; font-family: 'Clash Display', sans-serif;
     font-size: 1.2rem; font-weight: 600; cursor: pointer; &:disabled { background: #ccc; }
 `;
 const ResponseMessage = styled.p`
@@ -64,16 +60,10 @@ const ResponseMessage = styled.p`
 
 
 function Help() {
-    const navigate = useNavigate();
     const [openFaq, setOpenFaq] = useState(null);
     const [queryText, setQueryText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [responseMsg, setResponseMsg] = useState({ text: '', type: '' });
-
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) navigate('/');
-    }, [navigate]);
 
     const toggleFaq = (index) => {
         setOpenFaq(openFaq === index ? null : index);
@@ -83,17 +73,17 @@ function Help() {
         e.preventDefault();
         setIsLoading(true);
         setResponseMsg({ text: '', type: '' });
-        const token = localStorage.getItem('token');
 
         try {
-            const response = await axios.post('http://localhost:5001/api/support/query', 
-                { query_text: queryText },
-                { headers: { Authorization: `Bearer ${token}` }}
-            );
+            // --- THE FIX: Changed the endpoint from '/api/support/query' to '/api/support' ---
+            const response = await apiClient.post('/api/support', { query_text: queryText });
             setResponseMsg({ text: response.data.message, type: 'success' });
             setQueryText('');
         } catch (error) {
-            const message = error.response?.data?.message || 'An error occurred.';
+            // Use a more specific error message for "Not Found" errors
+            const message = error.response?.status === 404
+                ? "Could not find the support endpoint. Please contact the administrator."
+                : error.response?.data?.message || 'An error occurred.';
             setResponseMsg({ text: message, type: 'error' });
         } finally {
             setIsLoading(false);
@@ -125,7 +115,7 @@ function Help() {
                             onChange={(e) => setQueryText(e.target.value)}
                             required 
                         />
-                        <SubmitButton type="submit" disabled={isLoading}>
+                        <SubmitButton type="submit" disabled={isLoading || !queryText}>
                             {isLoading ? 'Sending...' : 'Send to Admin'}
                         </SubmitButton>
                         {responseMsg.text && (

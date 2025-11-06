@@ -1,15 +1,14 @@
-// src/pages/Login.jsx
-
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import styled, { ThemeProvider as StyledThemeProvider } from 'styled-components';
 import Lottie from "lottie-react";
-import axios from 'axios'; // ADDED: To make API calls
 
+import { useNavigate } from 'react-router-dom';
+
+import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { diamondAnimation } from '../assets/animationData.js';
 
-// --- Styled Components (No changes here, they are the same as your original file) ---
+// --- STYLED COMPONENTS (No changes here) ---
 const LoadingOverlay = styled.div`
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background-color: rgba(255, 255, 255, 0.8);
@@ -56,66 +55,53 @@ const CtaButton = styled.button`
     font-family: 'Clash Display', sans-serif; font-size: 1.2rem; font-weight: 600; cursor: pointer;
     &:disabled { background-color: #ccc; cursor: not-allowed; }
 `;
-// ADDED: A new styled component for displaying error messages
 const ErrorMessage = styled.p`
     color: #e53e3e; font-size: 0.9rem; text-align: center; margin-top: 1rem;
+`;
+const AdminLinkContainer = styled.div`
+    margin-top: 1.5rem;
+    text-align: center;
+    font-size: 0.9rem;
+`;
+
+const RegisterLinkContainer = styled.div`
+    margin-top: 1rem;
+    text-align: center;
+    font-size: 0.9rem;
+    color: ${props => props.theme.textSecondary};
+`;
+const StyledLink = styled.button`
+    background: none;
+    border: none;
+    color: ${props => props.theme.textPrimary}; 
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+    font-size: 0.9rem;
+    margin-left: 5px;
 `;
 
 
 function Login() {
     const [activeRole, setActiveRole] = useState('trader');
     const [isLoading, setIsLoading] = useState(false);
-    const navigate = useNavigate();
     const { currentTheme } = useTheme();
-    
-    // ADDED: State to hold form input and any login errors
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const { login } = useAuth();
 
-    // MODIFIED: The entire handleLogin function is now async and calls the backend
+    const navigate = useNavigate();
+
     const handleLogin = async (e) => {
         e.preventDefault();
         setIsLoading(true);
-        setError(''); // Clear previous errors
-
-        try {
-            const response = await axios.post('http://localhost:5001/api/auth/login', {
-                email,
-                password,
-            });
-
-            // Check if the API call was successful
-            if (response.data && response.data.token && response.data.user) {
-                const { token, user } = response.data;
-                
-                // IMPORTANT: Check if the logged-in user's role matches the selected toggle
-                if (user.role !== activeRole) {
-                    throw new Error(`Incorrect login type. Please log in as a ${user.role}.`);
-                }
-
-                // Save token and user info to the browser's local storage
-                localStorage.setItem('token', token);
-                localStorage.setItem('user', JSON.stringify(user));
-
-                // Navigate to the correct page based on user role
-                if (user.role === 'trader') {
-                    navigate('/trader-home');
-                } else if (user.role === 'broker') {
-                    navigate('/broker-home');
-                }
-            } else {
-                 throw new Error('Invalid response from server.');
-            }
-
-        } catch (err) {
-            // Display a user-friendly error message
-            const errorMessage = err.response?.data?.message || err.message || 'Login failed. Please check your credentials.';
-            setError(errorMessage);
-        } finally {
-            // This will run whether the login succeeds or fails
-            setIsLoading(false);
+        setError('');
+        const result = await login(email, password, activeRole);
+        if (!result.success) {
+            setError(result.message);
         }
+        setIsLoading(false);
     };
 
     if (!currentTheme) return null;
@@ -125,6 +111,8 @@ function Login() {
             {isLoading && (
                 <LoadingOverlay>
                     <Lottie animationData={diamondAnimation} loop={true} style={{ width: 150, height: 150 }}/>
+                    
+                    {/* ## FIX: Corrected the closing tag from </OpeningOverlay> to </LoadingOverlay> ## */}
                 </LoadingOverlay>
             )}
             <Container>
@@ -137,7 +125,6 @@ function Login() {
                             <ToggleButton $active={activeRole === 'broker'} onClick={() => setActiveRole('broker')}>Broker</ToggleButton>
                         </RoleToggle>
                         <form onSubmit={handleLogin}>
-                            {/* MODIFIED: Input fields are now controlled by React state */}
                             <InputField 
                                 type="email" 
                                 placeholder="Email" 
@@ -152,14 +139,35 @@ function Login() {
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                             />
-                            {/* MODIFIED: Button is disabled while loading */}
+                            
+                            {/* ## FIX: Corrected the closing tag from </CToButton> to </CtaButton> ## */}
                             <CtaButton type="submit" disabled={isLoading}>
                                 {isLoading ? 'Logging In...' : 'Login'}
                             </CtaButton>
-
-                            {/* ADDED: Display the error message if it exists */}
+                            
                             {error && <ErrorMessage>{error}</ErrorMessage>}
                         </form>
+                        
+                        <AdminLinkContainer>
+                            <button 
+                                type="button" 
+                                onClick={() => navigate('/admin/login')} 
+                                style={{ background: 'none', border: 'none', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: '0.9rem' }}
+                                >
+                                Admin Portal
+                            </button>
+                        </AdminLinkContainer>
+
+                        <RegisterLinkContainer>
+                            Don't have an account?
+                            <StyledLink 
+                                type="button" 
+                                onClick={() => navigate('/register')} 
+                                >
+                                Register
+                            </StyledLink>
+                        </RegisterLinkContainer>
+
                     </FormCard>
                 </AuthCard>
             </Container>

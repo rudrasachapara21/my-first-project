@@ -1,20 +1,31 @@
-// routes/newsRoutes.js
 const express = require('express');
 const router = express.Router();
 const newsController = require('../controllers/newsController');
 const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
 
-// GET /api/news - Get all news articles
-router.get('/', verifyToken, newsController.getAllNews);
-
-// POST /api/news - Create a new article
+// @route   POST api/news
+// @desc    Create a new news article
+// @access  Private (Admin only)
 router.post('/', [verifyToken, isAdmin], newsController.createNewsArticle);
 
-// GET /api/news/:id - Get a single article by ID
-// This must be placed before the delete route to be correctly matched
+// @route   GET api/news
+// @desc    Get all news articles
+// @access  Private (Authenticated users)
+router.get('/', verifyToken, newsController.getAllNews);
+
+// @route   GET api/news/:id
+// @desc    Get a single news article by its ID
+// @access  Private (Authenticated users)
 router.get('/:id', verifyToken, newsController.getArticleById);
 
-// DELETE /api/news/:id - Delete an article
+// @route   PUT api/news/:id
+// @desc    Update an existing news article
+// @access  Private (Admin only)
+router.put('/:id', [verifyToken, isAdmin], newsController.updateNewsArticle);
+
+// @route   DELETE api/news/:id
+// @desc    Delete a news article
+// @access  Private (Admin only)
 router.delete('/:id', [verifyToken, isAdmin], newsController.deleteNewsArticle);
 
 module.exports = router;

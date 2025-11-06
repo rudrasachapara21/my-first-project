@@ -2,7 +2,8 @@ import React from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
-import { PiUserCircle, PiPalette, PiBell, PiShieldCheck } from "react-icons/pi";
+// ## CHANGE: Imported the PiQuestion icon ##
+import { PiUserCircle, PiPalette, PiBell, PiShieldCheck, PiQuestion } from "react-icons/pi";
 
 const Container = styled.div``;
 const SettingsList = styled.div`
@@ -50,10 +51,14 @@ function Settings() {
           <PiBell size={28} color="#64748B" />
           <SettingsText>Notifications</SettingsText>
         </SettingsItem>
-        {/* CHANGED: This now navigates to the new security page */}
         <SettingsItem onClick={() => navigate('/security')}>
           <PiShieldCheck size={28} color="#64748B" />
           <SettingsText>Security</SettingsText>
+        </SettingsItem>
+        {/* ## NEW ITEM: Link to the Help page ## */}
+        <SettingsItem onClick={() => navigate('/help')}>
+          <PiQuestion size={28} color="#64748B" />
+          <SettingsText>Help & Support</SettingsText>
         </SettingsItem>
       </SettingsList>
     </Container>

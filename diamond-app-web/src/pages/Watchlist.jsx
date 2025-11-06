@@ -1,33 +1,21 @@
-// src/pages/Watchlist.jsx
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { useOutletContext, useNavigate } from 'react-router-dom';
-import { PiArrowLeft, PiStar } from "react-icons/pi";
+import apiClient from '../api/axiosConfig';
+import { useNavigate } from 'react-router-dom';
+import PageHeader from '../components/PageHeader';
+import { useAuth } from '../context/AuthContext';
 import EmptyState from '../components/EmptyState';
+import { PiStar } from "react-icons/pi";
 
 const Container = styled.div``;
 
-const Header = styled.header`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-`;
-
-const HeaderTitle = styled.h1`
-  font-family: 'Clash Display', sans-serif;
-  font-size: 2rem;
-  font-weight: 600;
-  color: ${props => props.theme.textPrimary};
-  margin: 0;
-`;
-
+// --- THE FIX: Added margin-top to create space below the header ---
 const ItemsList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 1rem;
   padding: 0 1.5rem;
+  margin-top: 1.5rem;
 `;
 
 const ItemCard = styled.div`
@@ -36,12 +24,13 @@ const ItemCard = styled.div`
   border-radius: 16px;
   padding: 1.5rem;
   box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  cursor: pointer;
 `;
 
 const CardHeader = styled.div`
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: 0.5rem;
 `;
 
@@ -66,30 +55,59 @@ const ItemDetails = styled.p`
   margin: 0.5rem 0 0 0;
 `;
 
+
 function Watchlist() {
     const navigate = useNavigate();
-    const { watchlist = [] } = useOutletContext() || {};
+    const { user } = useAuth();
+    const [watchlist, setWatchlist] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        if (!user) return;
+        const fetchWatchlist = async () => {
+            setIsLoading(true);
+            try {
+                const response = await apiClient.get('/api/watchlist');
+                setWatchlist(response.data);
+            } catch (error) { console.error("Failed to fetch watchlist:", error); }
+            finally { setIsLoading(false); }
+        };
+        fetchWatchlist();
+    }, [user]);
+    
+    const formatDiamondDetails = (details) => {
+        if (!details) return '';
+        let parts = [];
+        if (details.carat) parts.push(`${details.carat}ct`);
+        if (details.clarity) parts.push(details.clarity);
+        if (details.shape) parts.push(details.shape);
+        return parts.join(', ');
+    }
+
+    if (isLoading) {
+        return (
+            <Container>
+                <PageHeader title="My Watchlist" backTo={-1} />
+                <p style={{ textAlign: 'center' }}>Loading watchlist...</p>
+            </Container>
+        );
+    }
 
     return (
         <Container>
-            <Header>
-                <PiArrowLeft size={32} color="#64748B" onClick={() => navigate(-1)} style={{ cursor: 'pointer' }} />
-                <HeaderTitle>My Watchlist</HeaderTitle>
-                <div style={{ width: 32 }}></div>
-            </Header>
-            
+            <PageHeader title="My Watchlist" backTo={-1} />
             {watchlist.length > 0 ? (
                 <ItemsList>
                     {watchlist.map(item => (
-                        <ItemCard key={`${item.type}-${item.id}`}>
+                        <ItemCard key={item.listing_id} onClick={() => navigate(`/listing/${item.listing_id}`)}>
                             <CardHeader>
-                                <ItemTitle>{item.title}</ItemTitle>
+                                <ItemTitle>{item.title || formatDiamondDetails(item.diamond_details)}</ItemTitle>
                                 <ItemPrice>
-                                    {typeof item.price === 'number' ? `₹${item.price.toLocaleString('en-IN')}` : item.price}
+                                    {`₹${parseInt(item.price, 10).toLocaleString('en-IN')}`}
                                 </ItemPrice>
                             </CardHeader>
                             <ItemDetails>
-                                {item.type === 'demand' ? `Posted by: ${item.poster}` : `Specs: ${item.specs}`}
+                                Sold by: {item.trader_name}
                             </ItemDetails>
                         </ItemCard>
                     ))}
@@ -98,7 +116,7 @@ function Watchlist() {
                 <EmptyState 
                     icon={PiStar}
                     title="Your Watchlist is Empty"
-                    message="Click the star icon on a demand or listing to add it here."
+                    message="Click the star icon on a listing in the Buy Feed to add it here."
                 />
             )}
         </Container>

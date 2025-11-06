@@ -1,8 +1,6 @@
-// src/pages/NewsDetailPage.jsx
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../api/axiosConfig';
 import styled from 'styled-components';
 import PageHeader from '../components/PageHeader';
 
@@ -42,15 +40,14 @@ function NewsDetailPage() {
     const [article, setArticle] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) { navigate('/'); return; }
+    // ## CHANGE: Added for constructing image URLs ##
+    const API_ROOT_URL = import.meta.env.VITE_API_URL.replace('/api', '');
 
+    useEffect(() => {
         const fetchArticle = async () => {
             try {
-                const response = await axios.get(`http://localhost:5001/api/news/${newsId}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                // ## CHANGE: Using apiClient and a relative path ##
+                const response = await apiClient.get(`/api/news/${newsId}`);
                 setArticle(response.data);
             } catch (error) {
                 console.error("Failed to fetch article", error);
@@ -71,11 +68,16 @@ function NewsDetailPage() {
         return <p>Article not found.</p>;
     }
 
+    // ## CHANGE: Correctly build image URL ##
+    const imageUrl = article.image_url && !article.image_url.startsWith('http') 
+        ? `${API_ROOT_URL}${article.image_url}` 
+        : article.image_url;
+
     return (
         <Container>
             <PageHeader title="News" />
             <ArticleWrapper>
-                {article.image_url && <ArticleImage src={article.image_url} alt={article.title} />}
+                {imageUrl && <ArticleImage src={imageUrl} alt={article.title} />}
                 <ArticleTitle>{article.title}</ArticleTitle>
                 <ArticleMeta>
                     Posted on {new Date(article.created_at).toLocaleDateString('en-US', {

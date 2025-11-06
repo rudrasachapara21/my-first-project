@@ -1,0 +1,13 @@
+# Dependencies
+/node_modules
+
+# Environment Variables
+.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Uploads folder (if you don't want to track user uploads)
+/uploads

@@ -1,137 +1,215 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { useNavigate, useOutletContext } from 'react-router-dom';
-import axios from 'axios';
-import { PiList, PiUserCircle, PiHandWaving, PiBell } from "react-icons/pi";
-
+import { useNavigate } from 'react-router-dom';
+import apiClient from '../api/axiosConfig';
+import { PiHandWaving, PiDiamond } from "react-icons/pi";
+import { useAuth } from '../context/AuthContext';
+import { useWebSocket } from '../context/WebSocketContext';
+import AppHeader from '../components/AppHeader';
 import DashboardSummary from '../components/DashboardSummary';
-import NotificationCenter from '../components/NotificationCenter';
 import { SkeletonDemandCard } from '../components/SkeletonCard';
 
-// --- Styled Components (from your UI file) ---
+// ... (All your styled-components are the same, no changes needed) ...
 const Container = styled.div` font-family: 'Inter', sans-serif; `;
-const Header = styled.header`
-  display: flex; justify-content: space-between; align-items: center; padding: 1.5rem;
-`;
-const HeaderTitle = styled.h1`
-  font-family: 'Clash Display', sans-serif; font-size: 2rem; font-weight: 600;
-  color: ${props => props.theme.textPrimary}; margin: 0;
-`;
 const SectionTitle = styled.h2`
-  font-family: 'Clash Display', sans-serif; font-size: 1.8rem;
-  padding: 0 1.5rem; margin-bottom: 1.5rem; color: ${props => props.theme.textPrimary};
+  font-family: 'Clash Display', sans-serif;
+  font-size: 1.8rem;
+  padding: 0 1.5rem;
+  margin-top: 2rem;
+  margin-bottom: 1.5rem;
+  color: ${props => props.theme.textPrimary};
 `;
 const DemandsList = styled.div`
-  display: flex; flex-direction: column; gap: 1rem; padding: 0 1.5rem 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  padding: 0 1.5rem 1.5rem;
 `;
 const DemandCard = styled.div`
-  background: ${props => props.theme.bgSecondary}; border: 1px solid ${props => props.theme.borderColor};
-  border-radius: 16px; padding: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  background: ${props => props.theme.bgSecondary};
+  border: 1px solid ${props => props.theme.borderColor};
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  flex-direction: column;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+  }
 `;
-const CardHeader = styled.div`
-  display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;
+const DemandDetailGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  width: 100%;
 `;
-const DemandTitle = styled.div` font-size: 1.4rem; font-weight: 500; `;
-const DemandPrice = styled.div`
-  font-size: 1.1rem; font-weight: 700; color: ${props => props.theme.accentPrimary};
+const DetailItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: center;
 `;
-const DemandDetails = styled.p`
-  font-size: 0.9rem; color: ${props => props.theme.textSecondary};
-  line-height: 1.5; margin: 0 0 1.5rem 0;
+const DetailLabel = styled.span`
+  font-size: 0.8rem;
+  color: ${props => props.theme.textSecondary};
+`;
+const DetailValue = styled.span`
+  font-size: 1rem;
+  font-weight: 600;
+  color: ${props => props.theme.textPrimary};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
 `;
 const CardFooter = styled.div`
-  display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;
+  margin-top: auto;
+  padding-top: 1.5rem;
+  border-top: 1px solid ${props => props.theme.borderColor};
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+`;
+const InterestCount = styled.div`
+  font-weight: 500;
+  color: ${props => props.theme.textSecondary};
 `;
 const RaiseHandButton = styled.button`
-  padding: 0.6rem 1.2rem; border-radius: 8px; border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  border: none;
   background: ${props => (props.disabled ? props.theme.borderColor : props.theme.accentPrimary)};
   color: ${props => (props.disabled ? props.theme.textSecondary : 'white')};
   cursor: ${props => (props.disabled ? 'not-allowed' : 'pointer')};
-  font-weight: 700; display: flex; align-items: center; gap: 0.5rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   transition: all 0.2s ease-in-out;
-  &:active { transform: ${props => (props.disabled ? 'none' : 'scale(0.97)')}; }
+  
+  &:active {
+    transform: ${props => (props.disabled ? 'none' : 'scale(0.97)')};
+  }
 `;
-const HeaderActions = styled.div` display: flex; align-items: center; gap: 1rem; `;
-const BellWrapper = styled.div` position: relative; cursor: pointer; `;
-const NotificationBadge = styled.div`
-  position: absolute; top: -4px; right: -4px; background-color: #EF4444; color: white;
-  width: 18px; height: 18px; border-radius: 50%; font-size: 0.7rem; font-weight: bold;
-  display: flex; align-items: center; justify-content: center;
-`;
+
 
 function BrokerHome() {
   const navigate = useNavigate();
-  const { toggleSidebar, notifications = [], isNotificationsOpen, toggleNotifications } = useOutletContext() || {};
-
-  // --- State Management from our new functional component ---
+  const { user } = useAuth();
+  const { socket } = useWebSocket();
   const [demands, setDemands] = useState([]);
+  const [summaryStats, setSummaryStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [raisedHands, setRaisedHands] = useState(new Set());
-
-  // --- Data Fetching Logic ---
+  
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) { navigate('/'); return; }
+    if (!user) return;
 
-    const fetchDemands = async () => {
+    // --- CACHING FIX: STEP 1 ---
+    // Try to load cached data immediately to make the app feel fast
+    try {
+      const cachedDemands = localStorage.getItem('cachedDemands');
+      const cachedInterests = localStorage.getItem('cachedInterests');
+      const cachedStats = localStorage.getItem('cachedStats');
+
+      if (cachedDemands && cachedInterests && cachedStats) {
+        setDemands(JSON.parse(cachedDemands));
+        setRaisedHands(new Set(JSON.parse(cachedInterests)));
+        setSummaryStats(JSON.parse(cachedStats));
+        setIsLoading(false); // We have data, so we're not "loading"
+      } else {
+        setIsLoading(true); // No cache, so we ARE loading
+      }
+    } catch (e) {
+      console.error("Failed to load from cache", e);
+      setIsLoading(true); // Fail safe, just load normally
+    }
+
+    // --- CACHING FIX: STEP 2 ---
+    // Always fetch fresh data from the network in the background
+    const fetchData = async () => {
       try {
-        const response = await axios.get('http://localhost:5001/api/demands', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setDemands(response.data);
-
-        const interestedIds = new Set();
-        response.data.forEach(demand => {
-          if (demand.currentUserInterested) {
-            interestedIds.add(demand.demand_id);
-          }
-        });
-        setRaisedHands(interestedIds);
+        const [demandsRes, interestsRes, statsRes] = await Promise.all([
+            apiClient.get('/api/demands'),
+            apiClient.get('/api/demands/my-interests'),
+            apiClient.get('/api/stats/summary')
+        ]);
         
+        // Prepare data for state and cache
+        const demandsData = demandsRes.data;
+        const interestsData = Array.from(interestsRes.data); // Convert Set to Array for storage
+        const statsData = statsRes.data;
+
+        // Update state with fresh data
+        setDemands(demandsData);
+        setRaisedHands(new Set(interestsData));
+        setSummaryStats(statsData);
+
+        // --- CACHING FIX: STEP 3 ---
+        // Save the fresh data to the cache for the next visit
+        localStorage.setItem('cachedDemands', JSON.stringify(demandsData));
+        localStorage.setItem('cachedInterests', JSON.stringify(interestsData));
+        localStorage.setItem('cachedStats', JSON.stringify(statsData));
+
       } catch (error) {
-        console.error("Failed to fetch demands:", error);
+        console.error("Failed to fetch broker data:", error);
       } finally {
-        setIsLoading(false);
+        // Only set loading to false if we didn't have cache to begin with
+        if (!localStorage.getItem('cachedDemands')) {
+          setIsLoading(false);
+        }
       }
     };
-    fetchDemands();
-  }, [navigate]);
+    
+    fetchData();
+  }, [user]);
+  
+  useEffect(() => {
+    if (socket) {
+      const handleNewDemand = (newDemand) => {
+        if (newDemand.diamond_details) {
+            delete newDemand.diamond_details.private_name;
+        }
+        setDemands(prevDemands => {
+          const newDemands = [newDemand, ...prevDemands];
+          // Also update cache when websocket gets data
+          localStorage.setItem('cachedDemands', JSON.stringify(newDemands));
+          return newDemands;
+        });
+      };
+      socket.on('new-demand', handleNewDemand);
+      return () => {
+        socket.off('new-demand', handleNewDemand);
+      };
+    }
+  }, [socket]);
 
-  // --- "Raise Hand" Button Logic ---
-  const handleRaiseHand = async (demandId) => {
+  const handleRaiseHand = async (e, demandId) => {
+    e.stopPropagation();
     if (raisedHands.has(demandId)) return;
-    const token = localStorage.getItem('token');
     try {
-      await axios.post(`http://localhost:5001/api/demands/${demandId}/raise-hand`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setRaisedHands(prev => new Set(prev).add(demandId));
+        await apiClient.post(`/api/demands/${demandId}/interest`);
+        setRaisedHands(prev => {
+          const newRaisedHands = new Set(prev).add(demandId);
+          // Also update cache
+          localStorage.setItem('cachedInterests', JSON.stringify(Array.from(newRaisedHands)));
+          return newRaisedHands;
+        });
     } catch (error) {
-      if (error.response && error.response.status === 409) {
-        setRaisedHands(prev => new Set(prev).add(demandId));
-      } else {
         alert(error.response?.data?.message || "An error occurred.");
-      }
     }
   };
-
+  
   return (
     <Container>
-      <Header>
-        <PiList size={32} color="#64748B" onClick={toggleSidebar} style={{ cursor: 'pointer' }} />
-        <HeaderTitle>Broker Home</HeaderTitle>
-        <HeaderActions>
-            <BellWrapper onClick={toggleNotifications}>
-                <PiBell size={32} color="#64748B" />
-                {notifications.length > 0 && <NotificationBadge>{notifications.length}</NotificationBadge>}
-                {isNotificationsOpen && <NotificationCenter notifications={notifications} />}
-            </BellWrapper>
-            <PiUserCircle size={36} color="#A5B4FC" onClick={() => navigate('/edit-profile')} style={{ cursor: 'pointer' }} />
-        </HeaderActions>
-      </Header>
-
-      <DashboardSummary userType="broker" />
-
+      <AppHeader title="Home" />
+      <DashboardSummary stats={summaryStats} />
       <main>
         <SectionTitle>Live Market Demands</SectionTitle>
         <DemandsList>
@@ -140,25 +218,29 @@ function BrokerHome() {
           ) : (
             demands.map(demand => {
               const hasRaisedHand = raisedHands.has(demand.demand_id);
-              const demandTitle = `${demand.diamond_details.carat}ct, ${demand.diamond_details.clarity}, ${demand.diamond_details.shape}`;
-              // Note: Assuming price comes from a property like demand.price. Adjust if needed.
-              const demandPrice = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(demand.price || 0);
+              const d = demand.diamond_details || {};
 
               return (
-                <DemandCard key={demand.demand_id}>
-                  <CardHeader>
-                    <DemandTitle>{demandTitle}</DemandTitle>
-                    <DemandPrice>{demandPrice}</DemandPrice>
-                  </CardHeader>
-                  <DemandDetails>Posted by: {demand.user_name}</DemandDetails>
+                <DemandCard key={demand.demand_id} onClick={() => navigate(`/broker/demand/${demand.demand_id}`)}>
+                  <DemandDetailGrid>
+                    <DetailItem>
+                      <DetailLabel>Size (ct)</DetailLabel>
+                      <DetailValue><PiDiamond /> {d.size || '-'}</DetailValue>
+                    </DetailItem>
+                    <DetailItem>
+                      <DetailLabel>Clarity</DetailLabel>
+                      <DetailValue>{d.clarity || '-'}</DetailValue>
+                    </DetailItem>
+                    <DetailItem>
+                      <DetailLabel>Price/ct</DetailLabel>
+                      <DetailValue>${d.price_per_caret || '-'}</DetailValue>
+                    </DetailItem>
+                  </DemandDetailGrid>
                   <CardFooter>
-                    <div><strong>{demand.interest_count || 0}</strong> Brokers Interested</div>
-                    <RaiseHandButton 
-                      onClick={() => handleRaiseHand(demand.demand_id)}
-                      disabled={hasRaisedHand}
-                    >
+                    <InterestCount><strong>{demand.interest_count || 0}</strong> Brokers Interested</InterestCount>
+                    <RaiseHandButton onClick={(e) => handleRaiseHand(e, demand.demand_id)} disabled={hasRaisedHand} >
                       <PiHandWaving size={16} />
-                      {hasRaisedHand ? 'Interest Shown' : 'Raise Hand'}
+                      {hasRaisedHand ? 'Interest Shown' : 'Show Interest'}
                     </RaiseHandButton>
                   </CardFooter>
                 </DemandCard>

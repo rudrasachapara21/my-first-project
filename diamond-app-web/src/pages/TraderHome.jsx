@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { PiPlusCircle, PiBinoculars, PiStorefront, PiTag } from "react-icons/pi";
+import apiClient from '../api/axiosConfig';
+import { useAuth } from '../context/AuthContext';
 import AppHeader from '../components/AppHeader';
 import DashboardSummary from '../components/DashboardSummary';
 
@@ -11,7 +13,7 @@ const NavGrid = styled.main`
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  padding: 0 1.5rem;
+  padding: 0 1.5rem 1.5rem 1.5rem;
 `;
 
 const NavCard = styled.div`
@@ -27,7 +29,6 @@ const NavCard = styled.div`
   
   &:active { transform: scale(0.97); }
 
-  // FIX: Added a media query to reduce padding on small screens.
   @media (max-width: 480px) {
     padding: ${props => props.$primary ? '1.5rem' : '1rem'};
   }
@@ -39,7 +40,6 @@ const IconWrapper = styled.div`
   width: 30px;
   text-align: center;
   
-  // FIX: Reduced icon size and margin on small screens.
   @media (max-width: 480px) {
     font-size: 1.5rem;
     margin-right: 1rem;
@@ -50,7 +50,6 @@ const NavCardTitle = styled.div`
   font-size: 1.3rem;
   font-weight: 500;
   
-  // FIX: Reduced font size on small screens.
   @media (max-width: 480px) {
     font-size: 1.1rem;
   }
@@ -58,18 +57,35 @@ const NavCardTitle = styled.div`
 
 function TraderHome() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [summaryStats, setSummaryStats] = useState(null);
+  
+  useEffect(() => {
+    if (!user) return;
+    const fetchStats = async () => {
+        try {
+            // ## CHANGE: Using apiClient and added /api prefix ##
+            const response = await apiClient.get('/api/stats/summary');
+            setSummaryStats(response.data);
+        } catch (error) {
+            console.error("Failed to fetch trader stats:", error);
+        }
+    };
+    fetchStats();
+  }, [user]);
+
   return (
     <Container>
       <AppHeader title="Home" />
-      <DashboardSummary userType="trader" />
+      <DashboardSummary stats={summaryStats} />
       <NavGrid>
-        <NavCard $primary onClick={() => navigate('/post-demand')}>
+        <NavCard $primary onClick={() => navigate('/my-demands')}>
             <IconWrapper><PiPlusCircle /></IconWrapper>
             <NavCardTitle>Post a Demand</NavCardTitle>
         </NavCard>
-        <NavCard onClick={() => navigate('/view-demands')}>
+        <NavCard onClick={() => navigate('/my-demands')}>
             <IconWrapper><PiBinoculars /></IconWrapper>
-            <NavCardTitle>View Demands</NavCardTitle>
+            <NavCardTitle>My Demands</NavCardTitle>
         </NavCard>
         <NavCard onClick={() => navigate('/buy-feed')}>
             <IconWrapper><PiStorefront /></IconWrapper>
@@ -77,10 +93,11 @@ function TraderHome() {
         </NavCard>
         <NavCard onClick={() => navigate('/sell-diamonds')}>
             <IconWrapper><PiTag /></IconWrapper>
-            <NavCardTitle>Sell Diamonds</NavCardTitle>
+            <NavCardTitle>My Listings</NavCardTitle>
         </NavCard>
       </NavGrid>
     </Container>
   );
 }
+
 export default TraderHome;

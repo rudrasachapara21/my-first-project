@@ -1,27 +1,34 @@
-// controllers/supportController.js
 const db = require('../db');
 
-exports.submitQuery = async (req, res) => {
+exports.submitQuery = async (req, res, next) => {
     const { query_text } = req.body;
-    const userId = req.user.userId;
+    
+    // --- THE FINAL FIX: Changed req.user.userId to req.user.user_id ---
+    // This now correctly matches the object provided by the auth middleware.
+    const userId = req.user.user_id; 
+
+    if (!userId) {
+        return res.status(401).json({ message: "Authentication error. User ID not found." });
+    }
 
     if (!query_text) {
-        return res.status(400).json({ message: 'Query text cannot be empty.' });
+        return res.status(400).json({ message: "Query message is required." });
     }
 
     try {
-        const newQuery = `
-            INSERT INTO support_queries (user_id, query_text)
-            VALUES ($1, $2)
-            RETURNING *
+        const query = `
+            INSERT INTO support_queries (user_id, query_text, status)
+            VALUES ($1, $2, 'open') RETURNING query_id
         `;
-        const { rows } = await db.query(newQuery, [userId, query_text]);
+        
+        const { rows } = await db.query(query, [userId, query_text]);
+        
         res.status(201).json({ 
-            message: 'Your query has been submitted successfully!',
-            query: rows[0]
+            message: "Support query submitted successfully. We will get back to you shortly.",
+            ticketId: rows[0].query_id 
         });
     } catch (error) {
-        console.error('Submit query error:', error);
-        res.status(500).json({ message: 'Server error while submitting query.' });
+        console.error("Error submitting support query:", error);
+        next(error);
     }
 };

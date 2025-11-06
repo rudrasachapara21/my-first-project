@@ -1,10 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@500;600&family=Inter:wght@400;500;600&display=swap');
 
-/* Basic reset from before */
-body, html, #root {
+/* Basic reset */
+body,
+html,
+#root {
   margin: 0;
   padding: 0;
   width: 100%;
   min-height: 100vh;
   box-sizing: border-box;
+
+  /* FIX: Set the default font for the entire application */
+  font-family: 'Inter', sans-serif;
+
+  /* Optional: Add a default background color from your theme if you have one */
+  /* background-color: #f8fafc; */
 }

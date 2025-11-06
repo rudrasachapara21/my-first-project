@@ -1,14 +1,17 @@
-// routes/profileRoutes.js
 const express = require('express');
 const router = express.Router();
 const profileController = require('../controllers/profileController');
 const { verifyToken } = require('../middleware/authMiddleware');
-const upload = require('../middleware/fileUpload');
+const { uploadProfilePhoto } = require('../middleware/fileUpload');
 
-// Route to get the user's profile
+// @route   GET api/profile
+// @desc    Get the profile of the currently logged-in user
+// @access  Private (Authenticated users)
 router.get('/', verifyToken, profileController.getUserProfile);
 
-// Route to update the user's profile, including a single photo upload from a field named 'photo'
-router.put('/', verifyToken, upload.single('photo'), profileController.updateUserProfile);
+// @route   PUT api/profile
+// @desc    Update the profile of the currently logged-in user
+// @access  Private (Authenticated users)
+router.put('/', [verifyToken, uploadProfilePhoto], profileController.updateUserProfile);
 
 module.exports = router;

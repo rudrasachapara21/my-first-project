@@ -1,42 +1,29 @@
-// routes/demandRoutes.js
 const express = require('express');
 const router = express.Router();
-const demandController = require('../controllers/demandController.js');
-const { verifyToken, isTrader, isBroker } = require('../middleware/authMiddleware.js');
+const demandController = require('../controllers/demandController');
+const { verifyToken, isTrader, isBroker } = require('../middleware/authMiddleware');
 
-// @route   POST api/demands
-// @desc    Create a new demand
-// @access  Private (Trader only)
-router.post('/', [verifyToken, isTrader], demandController.createDemand);
-
-// @route   GET api/demands
-// @desc    Get all demands
-// @access  Private (All logged-in users)
-router.get('/', verifyToken, demandController.getAllDemands);
-
-// @route   GET api/demands/my
-// @desc    Get all demands for the logged-in user
-// @access  Private (All logged-in users)
-router.get('/my', verifyToken, demandController.getMyDemands);
-
-// @route   GET api/demands/:id
-// @desc    Get a single demand by ID
-// @access  Private (All logged-in users)
+// --- General Demand Routes ---
+router.post('/', verifyToken, isTrader, demandController.createDemand);
+router.get('/', verifyToken, isBroker, demandController.getAllDemands);
+router.get('/my-demands', verifyToken, isTrader, demandController.getMyDemands);
+router.get('/my-interests', verifyToken, isBroker, demandController.getMyInterests);
 router.get('/:id', verifyToken, demandController.getDemandById);
+router.delete('/:id', verifyToken, isTrader, demandController.deleteDemand);
 
-// @route   DELETE api/demands/:id
-// @desc    Delete a demand
-// @access  Private (Owner Trader only)
-router.delete('/:id', [verifyToken, isTrader], demandController.deleteDemand);
+// --- Demand Interaction Routes ---
+router.post('/:id/interest', verifyToken, isBroker, demandController.toggleInterest);
+router.post('/:demandId/complete/:brokerId', verifyToken, isTrader, demandController.completeDemand);
+router.post('/:demandId/hire/:brokerId', verifyToken, isTrader, demandController.hireBroker);
+router.delete('/:demandId/interest/:brokerId', verifyToken, isTrader, demandController.dismissBrokerInterest);
+router.post('/:demandId/unhire/:brokerId', verifyToken, isTrader, demandController.unhireBroker);
 
-// @route   POST api/demands/:id/raise-hand
-// @desc    Broker raises hand on a specific demand
-// @access  Private (Broker only)
-router.post('/:id/raise-hand', [verifyToken, isBroker], demandController.raiseHandOnDemand);
+// --- THE FIX: Added the new route for requesting details ---
+router.post('/:id/request-details', verifyToken, isBroker, demandController.requestMoreDetails);
 
-// @route   GET api/demands/:id/interests
-// @desc    Get all brokers interested in a specific demand
-// @access  Private (Owner Trader only)
-router.get('/:id/interests', [verifyToken, isTrader], demandController.getDemandInterests);
+
+// --- Broker Workspace Routes ---
+router.get('/workspace/hired', verifyToken, isBroker, demandController.getHiredDemands);
+router.get('/workspace/pending', verifyToken, isBroker, demandController.getPendingInterests);
 
 module.exports = router;
