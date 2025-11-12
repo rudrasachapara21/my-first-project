@@ -32,7 +32,7 @@ def predict():
     if model is None:
         print("Prediction error: Model is not loaded.")
         return jsonify({'error': 'Model not loaded'}), 500
-        
+
     try:
         data = request.get_json()
         features = {
