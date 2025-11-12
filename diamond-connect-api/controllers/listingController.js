@@ -3,7 +3,12 @@ const db = require('../db');
 exports.createListing = async (req, res, next) => {
     const { price, diamond_details } = req.body;
     const traderId = req.user.user_id;
-    const imageUrls = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+    
+    // ## --- THIS IS THE FIX --- ##
+    // 'req.files' is an array of files uploaded to Cloudinary.
+    // 'file.path' contains the full, secure URL (e.g., https://res.cloudinary.com/...)
+    const imageUrls = req.files ? req.files.map(file => file.path) : [];
+    // ## --- END OF FIX --- ##
 
     try {
         if (!diamond_details) {

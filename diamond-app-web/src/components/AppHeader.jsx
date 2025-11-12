@@ -4,6 +4,8 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { PiList, PiUserCircle, PiBell } from "react-icons/pi";
 import NotificationCenter from './NotificationCenter';
 import { useNotifications } from '../context/NotificationContext';
+// ## --- CHANGE 1: Import useAuth --- ##
+import { useAuth } from '../context/AuthContext'; 
 
 const Header = styled.header`
   display: flex;
@@ -73,14 +75,46 @@ const NotificationBadge = styled.div`
   justify-content: center;
 `;
 
+// ## --- CHANGE 2: Add the Avatar component --- ##
+const Avatar = styled.img`
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  cursor: pointer;
+  border: 2px solid ${props => props.theme.accentPrimary};
+`;
+
+// ## --- CHANGE 3: Add the avatar helper function --- ##
+const getAvatarUrl = (photoUrl, name) => {
+  if (!photoUrl) {
+    return `https://ui-avatars.com/api/?name=${name ? name.replace(' ', '+') : 'User'}&background=random`;
+  }
+  if (photoUrl.startsWith('http')) {
+    // It's a Cloudinary URL, use it directly
+    return photoUrl;
+  }
+  // It's an old /uploads/ file, but this case should no longer happen
+  // We'll add the API root just in case
+  const API_ROOT_URL = import.meta.env.VITE_API_URL.replace('/api', '');
+  return `${API_ROOT_URL}${photoUrl}`;
+};
+
+
 function AppHeader({ title }) {
     const navigate = useNavigate();
     const { unreadCount } = useNotifications();
     const { toggleSidebar } = useOutletContext() || {};
+    
+    // ## --- CHANGE 4: Get the user from AuthContext --- ##
+    const { user } = useAuth();
 
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     
     const closeDropdown = () => setIsDropdownOpen(false);
+    
+    // ## --- CHANGE 5: Build the avatar URL --- ##
+    const avatarUrl = getAvatarUrl(user?.profile_photo_url, user?.full_name);
 
     return (
         <Header>
@@ -91,7 +125,13 @@ function AppHeader({ title }) {
                     <PiBell size={32} color="#64748B" />
                     {unreadCount > 0 && <NotificationBadge>{unreadCount}</NotificationBadge>}
                 </BellWrapper>
-                <PiUserCircle size={36} color="#A5B4FC" onClick={() => navigate('/edit-profile')} style={{ cursor: 'pointer' }} />
+                
+                {/* ## --- CHANGE 6: Replace the icon with the Avatar --- ## */}
+                {user ? (
+                  <Avatar src={avatarUrl} alt={user.full_name} onClick={() => navigate('/edit-profile')} />
+                ) : (
+                  <PiUserCircle size={36} color="#A5B4FC" onClick={() => navigate('/edit-profile')} style={{ cursor: 'pointer' }} />
+                )}
 
                 {isDropdownOpen && <NotificationCenter onClose={closeDropdown} />}
             </HeaderActions>

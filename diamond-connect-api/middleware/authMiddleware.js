@@ -23,12 +23,19 @@ async function verifyToken(req, res, next) {
         const token = authHeader.split(' ')[1];
         const decoded = jwt.verify(token, JWT_SECRET);
 
-        // Fetch the user from the database to ensure they still exist
-        const query = 'SELECT user_id, full_name, email, role FROM users WHERE user_id = $1';
+        // ## --- UPDATED QUERY --- ##
+        // Fetch the user and their suspension status
+        const query = 'SELECT user_id, full_name, email, role, is_suspended FROM users WHERE user_id = $1';
         const { rows } = await db.query(query, [decoded.user_id]);
 
         if (rows.length === 0) {
             return res.status(401).json({ message: 'User associated with this token not found.' });
+        }
+
+        // ## --- NEW CHECK --- ##
+        // Check if the user is suspended
+        if (rows[0].is_suspended) {
+            return res.status(403).json({ message: 'Your account is suspended. Please contact support.' });
         }
 
         // Attach user information to the request object for use in subsequent routes
@@ -59,7 +66,7 @@ function isAdmin(req, res, next) {
  */
 function isTrader(req, res, next) {
     if (req.user?.role !== 'trader') {
-        return res.status(403).json({ message: 'Forbidden. Trader access is required.' });
+        return res.status(4403).json({ message: 'Forbidden. Trader access is required.' });
     }
     next();
 }

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const conversationController = require('../controllers/conversationController');
 const { verifyToken } = require('../middleware/authMiddleware');
-// --- CHANGE: Import the correct uploader ---
+// --- This import will now work correctly ---
 const { uploadDocument } = require('../middleware/fileUpload');
 
 // @route   POST api/conversations
@@ -22,8 +22,8 @@ router.get('/:id/messages', verifyToken, conversationController.getConversationM
 router.post(
     '/:id/documents', 
     verifyToken, 
-    // --- CHANGE: Use the new, correct middleware ---
-    uploadDocument.single('document'), 
+    // This middleware now exists and works with Cloudinary
+    uploadDocument, 
     conversationController.uploadDocumentInConversation
 );
 

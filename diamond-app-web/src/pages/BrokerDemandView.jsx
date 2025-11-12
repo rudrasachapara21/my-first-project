@@ -1,225 +1,297 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import apiClient from '../api/axiosConfig';
 import styled from 'styled-components';
+import apiClient from '../api/axiosConfig';
 import PageHeader from '../components/PageHeader';
+import { PiChatCircleDots, PiHand, PiCheckCircle, PiXCircle } from 'react-icons/pi';
 import { useAuth } from '../context/AuthContext';
-import { PiHandsClapping, PiXCircle, PiDiamond, PiQuestion } from 'react-icons/pi';
 
-const Container = styled.div` padding-bottom: 2rem; `;
-const Content = styled.div` padding: 0 1.5rem; `;
-const Wrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  margin-top: 1.5rem;
+// --- Styles ---
+const Container = styled.div`
+  padding-bottom: 2rem;
+`;
+const Content = styled.div`
+  padding: 0 1.5rem;
 `;
 const DemandCard = styled.div`
   background: ${props => props.theme.bgSecondary};
   border: 1px solid ${props => props.theme.borderColor};
   border-radius: 16px;
-  padding: 1.5rem;
+  margin-top: 1.5rem;
 `;
-const DemandTitle = styled.h2`
+const CardHeader = styled.div`
+  padding: 1.5rem;
+  border-bottom: 1px solid ${props => props.theme.borderColor};
+`;
+const Title = styled.h2`
   font-family: 'Clash Display', sans-serif;
-  font-size: 1.8rem;
+  font-size: 1.5rem;
   font-weight: 600;
-  margin: 0 0 1.5rem 0;
   color: ${props => props.theme.textPrimary};
+  margin: 0;
 `;
 const DetailGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  padding: 1.5rem;
 `;
 const DetailItem = styled.div`
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  background: ${props => props.theme.background};
-  padding: 1rem;
-  border-radius: 12px;
+  flex-direction: column;
+  gap: 0.25rem;
 `;
-const DetailIcon = styled.div`
-  font-size: 1.5rem;
-  color: ${props => props.theme.accentPrimary};
-`;
-const DetailText = styled.div`
-  font-size: 1rem;
+const DetailLabel = styled.span`
+  font-size: 0.9rem;
+  color: ${props => props.theme.textSecondary};
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+const DetailValue = styled.span`
+  font-size: 1.1rem;
+  font-weight: 600;
   color: ${props => props.theme.textPrimary};
 `;
-const ActionButtonsContainer = styled.div`
+
+// ## --- THIS IS THE FIX (Part 1) --- ##
+// Added cursor: pointer and a hover effect
+const TraderInfo = styled.div`
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 1rem;
+  padding: 1.5rem;
+  border-top: 1px solid ${props => props.theme.borderColor};
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: ${props => props.theme.bgPrimary};
+  }
 `;
-const InterestButton = styled.button`
-  width: 100%;
-  padding: 1.2rem;
+// ## --- END OF FIX --- ##
+
+const Avatar = styled.img`
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+`;
+const TraderDetails = styled.div`
+  flex-grow: 1;
+`;
+const TraderName = styled.h3`
+  margin: 0 0 0.25rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: ${props => props.theme.textPrimary};
+`;
+const TraderOffice = styled.p`
+  margin: 0;
+  font-size: 0.9rem;
+  color: ${props => props.theme.textSecondary};
+`;
+const ActionButton = styled.button`
+  flex: 1;
+  padding: 0.8rem;
   border: none;
   border-radius: 12px;
   font-family: 'Clash Display', sans-serif;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  transition: all 0.2s ease-in-out;
+  width: 100%;
   
-  background-color: ${props => props.$interested ? props.theme.bgSecondary : props.theme.accentPrimary};
-  color: ${props => props.$interested ? '#ef4444' : 'white'};
-  border: ${props => props.$interested ? `1px solid #ef4444` : 'none'};
+  background-color: ${props => props.$primary ? props.theme.accentPrimary : props.theme.bgPrimary};
+  color: ${props => props.$primary ? 'white' : props.theme.textPrimary};
+  border: 1px solid ${props => props.$primary ? props.theme.accentPrimary : props.theme.borderColor};
 
-  &:hover {
-    opacity: 0.9;
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 `;
-const SecondaryButton = styled(InterestButton)`
-  background-color: transparent;
-  color: ${props => props.theme.textSecondary};
-  border: 1px solid ${props => props.theme.borderColor};
-  font-size: 1.1rem;
-  padding: 1rem;
-
-  &:hover {
-    background-color: ${props => props.theme.bgSecondary};
-    border-color: ${props => props.theme.accentPrimary};
-    color: ${props => props.theme.accentPrimary};
-  }
-`;
-const TraderProfileCard = styled.div`
-  background: ${props => props.theme.bgSecondary};
-  border: 1px solid ${props => props.theme.borderColor};
-  border-radius: 16px;
-  padding: 1.5rem;
+const ButtonGroup = styled.div`
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 1rem;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-  &:hover {
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  padding: 1.5rem;
+  border-top: 1px solid ${props => props.theme.borderColor};
+`;
+const InterestButton = styled(ActionButton)`
+  background-color: ${props => props.$active ? props.theme.accentDangerLight : props.theme.accentPrimary};
+  color: ${props => props.$active ? props.theme.accentDanger : 'white'};
+  border-color: ${props => props.$active ? props.theme.accentDanger : props.theme.accentPrimary};
+`;
+// --- (End of Styles) ---
+
+
+// ## --- AVATAR HELPER FUNCTION --- ##
+const getAvatarUrl = (photoUrl, name) => {
+  const API_ROOT_URL = import.meta.env.VITE_API_URL.replace('/api', '');
+  if (!photoUrl) {
+    return `https://ui-avatars.com/api/?name=${name ? name.replace(' ', '+') : 'User'}&background=random`;
   }
-`;
-const TraderAvatar = styled.img`
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  object-fit: cover;
-`;
-const TraderInfo = styled.div``;
-const TraderName = styled.h3`
-  margin: 0 0 0.25rem 0;
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: ${props => props.theme.textPrimary};
-`;
-const TraderOffice = styled.p`
-  margin: 0;
-  color: ${props => props.theme.textSecondary};
-`;
+  if (photoUrl.startsWith('http')) {
+    // It's a Cloudinary URL, use it directly
+    return photoUrl;
+  }
+  // It's an old /uploads/ file, add the API root
+  return `${API_ROOT_URL}${photoUrl}`;
+};
+
 
 function BrokerDemandView() {
   const { demandId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  
   const [demand, setDemand] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  
-  const API_URL = import.meta.env.VITE_API_URL.replace('/api', '');
-  
+  const [isInterested, setIsInterested] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState('');
+
   useEffect(() => {
-    if (!user) return;
-    setIsLoading(true);
-    apiClient.get(`/api/demands/${demandId}`)
-      .then(res => setDemand(res.data))
-      .catch(err => {
-        console.error("Failed to fetch demand details for broker view:", err);
-        navigate('/workspace');
-      })
-      .finally(() => setIsLoading(false));
-  }, [demandId, user, navigate]);
+    const fetchDemand = async () => {
+      if (!demandId) return;
+      setIsLoading(true);
+      try {
+        const response = await apiClient.get(`/api/demands/${demandId}`);
+        setDemand(response.data);
+        setIsInterested(response.data.isInterested);
+      } catch (err) {
+        console.error("Failed to fetch demand details", err);
+        setError("Failed to load demand.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchDemand();
+  }, [demandId]);
 
   const handleToggleInterest = async () => {
+    setIsProcessing(true);
     try {
       await apiClient.post(`/api/demands/${demandId}/interest`);
-      setDemand(prev => ({ ...prev, isInterested: !prev.isInterested }));
-    } catch (error) {
-      alert(error.response?.data?.message || 'Action failed.');
+      setIsInterested(!isInterested);
+    } catch (err) {
+      alert("Failed to update interest. Please try again.");
+      console.error(err);
+    } finally {
+      setIsProcessing(false);
     }
   };
-
+  
   const handleRequestDetails = async () => {
-    if (window.confirm("Are you sure you want to request more details from the trader? They will be notified.")) {
-      try {
-        await apiClient.post(`/api/demands/${demandId}/request-details`);
-        alert("The trader has been notified of your request for more details.");
-      } catch (error) {
-        alert(error.response?.data?.message || "Could not send the request.");
-      }
+    setIsProcessing(true);
+    try {
+      const response = await apiClient.post(`/api/demands/${demandId}/request-details`);
+      alert(response.data.message || "Details have been sent to your chat.");
+      navigate('/chats');
+    } catch (err) {
+      alert(error.response?.data?.message || "Failed to request details.");
+      console.error(err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
+  const handleStartChat = async (traderId, traderName) => {
+    try {
+      const response = await apiClient.post(`/api/conversations`, { recipientId: traderId });
+      navigate(`/chat/${response.data.conversation_id}`, { state: { partnerName: traderName } });
+    } catch (error) {
+      alert(error.response?.data?.message || "Could not start conversation.");
     }
   };
 
-  if (isLoading || !demand) {
-    return (
-        <Container>
-            <PageHeader title="Loading Demand..." backTo="/workspace" />
-        </Container>
-    );
-  }
+  if (isLoading) return <p>Loading demand...</p>;
+  if (error) return <p>{error}</p>;
+  if (!demand) return <p>Demand not found.</p>;
 
-  const d = demand.diamond_details || {};
-  const demandTitle = `Demand for ${d.size || '?'}ct Diamond`;
-  const details = [
-    { label: 'Carat', value: d.size },
-    { label: 'Clarity', value: d.clarity },
-    { label: 'Price/ct', value: d.price_per_caret ? `$${d.price_per_caret}`: null },
-    { label: 'Quantity', value: d.quantity },
-  ].filter(item => item.value);
+  const d = demand.diamond_details;
+  const t = demand.traderProfile;
+  const isHired = demand.hired_broker_id === user.id;
 
-  const traderAvatarUrl = demand.traderProfile?.profile_photo_url
-    ? `${API_URL}${demand.traderProfile.profile_photo_url}`
-    : `https://ui-avatars.com/api/?name=${demand.traderProfile?.full_name.replace(' ', '+') || 'Trader'}&background=random`;
-
+  const avatarUrl = getAvatarUrl(t.profile_photo_url, t.full_name);
+  
   return (
     <Container>
-      <PageHeader title="Demand Details" backTo="/buy-feed" />
+      <PageHeader title="Demand Details" backTo="/broker-home" />
       <Content>
-        <Wrapper>
-          <DemandCard>
-            <DemandTitle>{demandTitle}</DemandTitle>
-            <DetailGrid>
-              {details.map(item => (
-                <DetailItem key={item.label}>
-                  <DetailIcon><PiDiamond /></DetailIcon>
-                  <DetailText>{item.label}: <strong>{item.value}</strong></DetailText>
-                </DetailItem>
-              ))}
-            </DetailGrid>
-          </DemandCard>
+        <DemandCard>
+          <CardHeader>
+            <Title>Demand for {d.size}ct {d.clarity} Diamond</Title>
+          </CardHeader>
+          <DetailGrid>
+            <DetailItem>
+              <DetailLabel>Carat:</DetailLabel>
+              <DetailValue>{d.size}</DetailValue>
+            </DetailItem>
+            <DetailItem>
+              <DetailLabel>Clarity:</DetailLabel>
+              <DetailValue>{d.clarity}</DetailValue>
+            </DetailItem>
+            <DetailItem>
+              <DetailLabel>Price/ct:</DetailLabel>
+              <DetailValue>${d.price_per_caret}</DetailValue>
+            </DetailItem>
+            <DetailItem>
+              <DetailLabel>Quantity:</DetailLabel>
+              <DetailValue>{d.quantity}</DetailValue>
+            </DetailItem>
+          </DetailGrid>
+          
+          {/* ## --- THIS IS THE FIX (Part 2) --- ## */}
+          {/* Added the onClick handler to navigate to the trader's profile */}
+          <TraderInfo onClick={() => navigate(`/profile/${t.user_id}`)}>
+            <Avatar src={avatarUrl} alt={t.full_name} />
+            <TraderDetails>
+              <TraderName>{t.full_name}</TraderName>
+              <TraderOffice>{t.office_name}</TraderOffice>
+            </TraderDetails>
+          </TraderInfo>
+          {/* ## --- END OF FIX --- ## */}
 
-          {demand.traderProfile && (
-            <TraderProfileCard onClick={() => navigate(`/profile/${demand.traderProfile.user_id}`)}>
-              <TraderAvatar src={traderAvatarUrl} alt={demand.traderProfile.full_name} />
-              <TraderInfo>
-                  <TraderName>{demand.traderProfile.full_name}</TraderName>
-                  <TraderOffice>{demand.traderProfile.office_name}</TraderOffice>
-              </TraderInfo>
-            </TraderProfileCard>
-          )}
-
-          <ActionButtonsContainer>
-            <InterestButton $interested={demand.isInterested} onClick={handleToggleInterest}>
-              {demand.isInterested ? <><PiXCircle /> Withdraw Interest</> : <><PiHandsClapping /> Show Interest</>}
-            </InterestButton>
-            <SecondaryButton onClick={handleRequestDetails}>
-              <PiQuestion /> Request More Details
-            </SecondaryButton>
-          </ActionButtonsContainer>
-        </Wrapper>
+          <ButtonGroup>
+            {isHired ? (
+              <>
+                <ActionButton $primary disabled>
+                  <PiCheckCircle /> You are Hired
+                </ActionButton>
+                <ActionButton onClick={() => handleStartChat(t.user_id, t.full_name)}>
+                  <PiChatCircleDots /> Message Trader
+                </ActionButton>
+              </>
+            ) : demand.hired_broker_id ? (
+              <ActionButton disabled>
+                <PiXCircle /> Deal in Progress
+              </ActionButton>
+            ) : (
+              <>
+                <InterestButton 
+                  $active={isInterested} 
+                  onClick={handleToggleInterest} 
+                  disabled={isProcessing}
+                >
+                  <PiHand /> {isInterested ? 'Withdraw Interest' : 'Show Interest'}
+                </InterestButton>
+                <ActionButton 
+                  onClick={handleRequestDetails} 
+                  disabled={isProcessing}
+                >
+                  Request More Details
+                </ActionButton>
+              </>
+            )}
+          </ButtonGroup>
+        </DemandCard>
       </Content>
     </Container>
   );

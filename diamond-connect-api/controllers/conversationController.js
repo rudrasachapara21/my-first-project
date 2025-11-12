@@ -120,23 +120,25 @@ exports.uploadDocumentInConversation = async (req, res, next) => {
             throw new Error('Forbidden: You are not a participant in this conversation.');
         }
 
-        const { originalname, path: filePath } = req.file;
-        const relativeFilePath = path.relative(process.cwd(), filePath);
-        const attachmentUrl = `/${relativeFilePath}`;
+        // ## --- THIS IS THE FIX --- ##
+        // Cloudinary provides the original name and the secure URL.
+        const { originalname, path: attachmentUrl } = req.file;
+        // ## --- END OF FIX --- ##
 
         const docQuery = `
             INSERT INTO secure_documents (conversation_id, uploader_id, file_name, file_path)
             VALUES ($1, $2, $3, $4) RETURNING document_id;
         `;
+        // Save the permanent URL to the database
         await client.query(docQuery, [conversationId, uploaderId, originalname, attachmentUrl]);
 
         const messageContent = `📎 Document: ${originalname}`;
         
-        // --- THE FIX: Added the attachment_url to the INSERT statement ---
         const msgQuery = `
             INSERT INTO messages (conversation_id, sender_id, content, attachment_url)
             VALUES ($1, $2, $3, $4) RETURNING *;
         `;
+        // Save the permanent URL to the message as well
         const { rows: msgRows } = await client.query(msgQuery, [conversationId, uploaderId, messageContent, attachmentUrl]);
         const newMessage = msgRows[0];
         

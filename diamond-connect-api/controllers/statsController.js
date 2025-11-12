@@ -63,17 +63,93 @@ exports.getAdminSummary = async (req, res, next) => {
     }
 };
 
+// ## --- UPDATED THIS FUNCTION --- ##
 exports.getUserGrowthChartData = async (req, res, next) => {
     try {
+        // Query by MONTH for the last 12 MONTHS
         const query = `
-            SELECT DATE_TRUNC('day', created_at)::DATE AS date, COUNT(user_id) AS count
+            SELECT 
+                DATE_TRUNC('month', created_at)::DATE AS date, 
+                COUNT(user_id) AS count
             FROM users
-            WHERE created_at > NOW() - INTERVAL '7 days' AND role != 'admin'
+            WHERE created_at > NOW() - INTERVAL '12 months' AND role != 'admin'
             GROUP BY date
             ORDER BY date ASC;
         `;
         const { rows } = await db.query(query);
         res.status(200).json(rows);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ## --- UPDATED THIS FUNCTION --- ##
+exports.getMarketActivity = async (req, res, next) => {
+    try {
+        // Query by MONTH for the last 12 MONTHS
+        const query = `
+            WITH all_months AS (
+                SELECT generate_series(
+                    DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '11 months', 
+                    DATE_TRUNC('month', CURRENT_DATE), 
+                    '1 month'
+                )::DATE AS date
+            ),
+            monthly_demands AS (
+                SELECT DATE_TRUNC('month', created_at)::DATE AS date, COUNT(demand_id) AS demands
+                FROM demands
+                WHERE created_at > NOW() - INTERVAL '12 months'
+                GROUP BY date
+            ),
+            monthly_listings AS (
+                SELECT DATE_TRUNC('month', created_at)::DATE AS date, COUNT(listing_id) AS listings
+                FROM listings
+                WHERE created_at > NOW() - INTERVAL '12 months'
+                GROUP BY date
+            )
+            SELECT 
+                d.date, 
+                COALESCE(md.demands, 0) AS demands_count, 
+                COALESCE(ml.listings, 0) AS listings_count
+            FROM all_months d
+            LEFT JOIN monthly_demands md ON d.date = md.date
+            LEFT JOIN monthly_listings ml ON d.date = ml.date
+            ORDER BY d.date ASC;
+        `;
+        const { rows } = await db.query(query);
+        res.status(200).json(rows);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// This function is unchanged
+exports.getUserVerificationStats = async (req, res, next) => {
+    try {
+        const query = `
+            SELECT 
+                is_verified, 
+                COUNT(user_id) AS count
+            FROM users
+            WHERE role != 'admin'
+            GROUP BY is_verified;
+        `;
+        const { rows } = await db.query(query);
+        
+        let stats = {
+            verified: 0,
+            pending: 0
+        };
+
+        rows.forEach(row => {
+            if (row.is_verified) {
+                stats.verified = parseInt(row.count, 10);
+            } else {
+                stats.pending = parseInt(row.count, 10);
+            }
+        });
+
+        res.status(200).json(stats);
     } catch (error) {
         next(error);
     }

@@ -16,25 +16,40 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
 
   // 1. Wait until we're done loading
   if (isLoading) {
-    // You can return a proper spinner here if you want
     return <FullScreenLoader />; 
   }
 
   // 2. After loading, check if user is logged in
   if (!user) {
     // If not logged in, redirect to login page
-    // state: { from: location } helps redirect back after login
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   
-  // 3. (For Admin routes) Check if adminOnly is true and user is not an admin
-  if (adminOnly && user.role !== 'admin') {
-    // Redirect non-admins away from admin pages
-    return <Navigate to="/" replace />;
-  }
+  // ## --- THIS IS THE NEW, CORRECTED LOGIC --- ##
 
-  // 4. If logged in and has correct role, show the page
-  return children;
+  // 3. Check for ADMIN routes
+  if (adminOnly) {
+    // If route is adminOnly, user MUST be 'admin'
+    if (user.role === 'admin') {
+      return children; // Good: Admin on admin route
+    } else {
+      // Bad: Trader/Broker on admin route. Redirect to their home.
+      return <Navigate to="/" replace />;
+    }
+  }
+  
+  // 4. Check for USER routes (adminOnly is false)
+  if (!adminOnly) {
+    // If route is a user route, user MUST be 'trader' or 'broker'
+    if (user.role === 'trader' || user.role === 'broker') {
+      return children; // Good: User on user route
+    } else {
+      // Bad: Admin on user route. Redirect to admin home.
+      return <Navigate to="/admin" replace />;
+    }
+  }
+  
+  // ## --- END OF NEW LOGIC --- ##
 };
 
 export default ProtectedRoute;

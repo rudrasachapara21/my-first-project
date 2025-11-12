@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-// ## CHANGE: Corrected the import path ##
 import apiClient from '../../api/axiosConfig';
 import { useOutletContext } from 'react-router-dom';
-import { PiUsersThree, PiDiamondsFour, PiPaperPlaneTilt, PiNewspaper } from "react-icons/pi";
+// ## --- UPDATED ICONS --- ##
+import { PiUsersThree, PiDiamondsFour, PiPaperPlaneTilt, PiNewspaper, PiCheckCircle, PiHourglass } from "react-icons/pi";
 import UserGrowthChart from './UserGrowthChart';
+import MarketActivityChart from './MarketActivityChart';
+// ## --- REMOVED UserStatusChart --- ##
 
 const Title = styled.h1`
   font-family: 'Clash Display', sans-serif;
@@ -27,10 +29,12 @@ const StatCard = styled.div`
 `;
 const StatIcon = styled.div`
   font-size: 2.5rem;
-  color: #4f46e5;
+  /* Use the color prop if provided, otherwise default */
+  color: ${props => props.color || '#4f46e5'};
   margin-right: 1.5rem;
   padding: 0.8rem;
-  background-color: #eef2ff;
+  /* Use the color prop for background too */
+  background-color: ${props => props.bgColor || '#eef2ff'};
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -49,6 +53,27 @@ const StatLabel = styled.p`
   margin: 0.25rem 0 0 0;
   font-size: 0.9rem;
 `;
+
+// This grid holds the Line Chart and the new Stat Cards
+const MainChartGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-top: 3rem;
+
+  @media (min-width: 1024px) {
+    grid-template-columns: 2fr 1fr; /* Line chart is 2/3, Cards are 1/3 */
+  }
+`;
+
+// ## --- NEW: A simple container for the two new cards --- ##
+const StatusCardContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  height: 100%;
+`;
+
 const ActivityGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -99,22 +124,33 @@ const ItemMeta = styled.span`
 
 function AdminDashboard() {
   const [stats, setStats] = useState(null);
+  // ## --- NEW STATE for verification stats --- ##
+  const [userStatus, setUserStatus] = useState({ verified: 0, pending: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const { users = [], news = [] } = useOutletContext() || {};
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchAllStats = async () => {
       try {
-        // ## CHANGE: Using apiClient and added /api prefix ##
-        const response = await apiClient.get('/api/stats/admin-summary');
-        setStats(response.data);
+        // Fetch all 3 endpoints in parallel
+        const summaryPromise = apiClient.get('/api/stats/admin-summary');
+        const verificationPromise = apiClient.get('/api/stats/user-verification');
+        
+        const [summaryResponse, verificationResponse] = await Promise.all([
+          summaryPromise,
+          verificationPromise
+        ]);
+
+        setStats(summaryResponse.data);
+        setUserStatus(verificationResponse.data);
+
       } catch (error) {
         console.error("Failed to fetch admin stats:", error);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchStats();
+    fetchAllStats();
   }, []);
 
   if (isLoading) {
@@ -154,9 +190,39 @@ function AdminDashboard() {
           </StatInfo>
         </StatCard>
       </StatGrid>
-
-      <div style={{ marginTop: '3rem' }}>
+      
+      {/* Grid 1: User Growth (Line) and NEW User Status (Cards) */}
+      <MainChartGrid>
         <UserGrowthChart />
+        
+        {/* ## --- THIS REPLACES THE DONUT CHART --- ## */}
+        <StatusCardContainer>
+          <StatCard>
+            <StatIcon color="#f59e0b" bgColor="#fffbeb">
+              <PiHourglass />
+            </StatIcon>
+            <StatInfo>
+              <StatValue>{userStatus.pending}</StatValue>
+              <StatLabel>Pending Approval</StatLabel>
+            </StatInfo>
+          </StatCard>
+          <StatCard>
+            <StatIcon color="#16a34a" bgColor="#f0fdf4">
+              <PiCheckCircle />
+            </StatIcon>
+            <StatInfo>
+              <StatValue>{userStatus.verified}</StatValue>
+              <StatLabel>Verified Users</StatLabel>
+            </StatInfo>
+          </StatCard>
+        </StatusCardContainer>
+        {/* ## --- END OF REPLACEMENT --- ## */}
+
+      </MainChartGrid>
+
+      {/* Grid 2: Market Activity (Bar) */}
+      <div style={{ marginTop: '1.5rem' }}>
+        <MarketActivityChart />
       </div>
 
       <ActivityGrid>

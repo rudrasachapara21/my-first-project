@@ -5,7 +5,8 @@ const db = require('./db');
 function init(httpServer) {
     const io = new Server(httpServer, {
         cors: {
-            // --- THIS IS THE CORRECTED LINE ---
+            // ## --- THIS IS THE FIX --- ##
+            // This tells Socket.IO to trust your frontend origin
             origin: process.env.CORS_ORIGIN, 
             methods: ["GET", "POST"]
         }

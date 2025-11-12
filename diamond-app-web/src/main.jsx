@@ -46,6 +46,12 @@ import ManageUsers from './pages/admin/ManageUsers.jsx';
 import ManageNews from './pages/admin/ManageNews.jsx';
 import AdminLogin from './pages/admin/AdminLogin.jsx';
 
+// ## --- NEW IMPORTS --- ##
+import AdminUserListPage from './pages/admin/AdminUserListPage.jsx';
+// (We will create this file in the next step)
+import AdminUserDetailPage from './pages/admin/AdminUserDetailPage.jsx';
+
+
 // --- THIS IS THE FIX ---
 
 // 1. Create a simple loading screen that uses your theme
@@ -111,6 +117,13 @@ const AppRoutes = () => {
         <Route index element={<AdminDashboard />} />
         <Route path="users" element={<ManageUsers />} />
         <Route path="news" element={<ManageNews />} />
+        
+        {/* ## --- NEW ROUTES ADDED --- ## */}
+        {/* This is the new list/search page */}
+        <Route path="user-monitoring" element={<AdminUserListPage />} />
+        {/* This is the new detail/tabs page */}
+        <Route path="user-monitoring/:userId" element={<AdminUserDetailPage />} />
+
       </Route>
     </Routes>
   );
