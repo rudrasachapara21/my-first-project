@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import apiClient from '../api/axiosConfig';
@@ -9,7 +9,7 @@ import {
     PiMedal, PiStar, PiStarFill, PiStarHalfFill, PiUsers, PiChatText
 } from 'react-icons/pi';
 
-// --- (Container, Wrapper, Card, Avatar, Name... all same) ---
+// --- Styles ---
 const Container = styled.div``;
 const ProfileWrapper = styled.div`
   padding: 1.5rem;
@@ -201,8 +201,6 @@ const EmptyState = styled.div`
   padding: 2rem;
   color: ${props => props.theme.textSecondary};
 `;
-
-// ## --- ALL NEW MODAL STYLES ADDED --- ##
 const ModalBackdrop = styled.div`
   position: fixed;
   top: 0;
@@ -236,11 +234,11 @@ const ModalActions = styled.div`
 const ModalButton = styled.button`
   padding: 0.8rem 1.5rem;
   border-radius: 8px;
-  border: 1px solid ${props => props.primary ? 'transparent' : props.theme.borderColor};
+  border: 1px solid ${props => props.$primary ? 'transparent' : props.theme.borderColor};
   font-weight: 600;
   cursor: pointer;
-  background: ${props => props.primary ? props.theme.accentPrimary : 'transparent'};
-  color: ${props => props.primary ? 'white' : props.theme.textPrimary};
+  background: ${props => props.$primary ? props.theme.accentPrimary : 'transparent'};
+  color: ${props => props.$primary ? 'white' : props.theme.textPrimary};
 `;
 const StarRatingContainer = styled.div`
   display: flex;
@@ -281,7 +279,7 @@ const ReviewTextArea = styled.textarea`
   color: ${props => props.theme.textPrimary};
   resize: vertical;
 `;
-// ## --- END NEW MODAL STYLES --- ##
+// --- (End of Styles) ---
 
 
 // --- Helper Components (AnimatedCounter, StarRating) ---
@@ -316,6 +314,21 @@ const StarRating = ({ rating }) => {
 };
 
 
+// ## --- NEW HELPER FUNCTION --- ##
+const getAvatarUrl = (photoUrl, name) => {
+  const API_ROOT_URL = import.meta.env.VITE_API_URL.replace('/api', '');
+  if (!photoUrl) {
+    return `https://ui-avatars.com/api/?name=${name ? name.replace(' ', '+') : 'User'}&background=random`;
+  }
+  if (photoUrl.startsWith('http')) {
+    // It's a Cloudinary URL, use it directly
+    return photoUrl;
+  }
+  // It's an old /uploads/ file, add the API root
+  return `${API_ROOT_URL}${photoUrl}`;
+};
+
+
 function BrokerProfilePage() {
     const { userId } = useParams();
     const navigate = useNavigate();
@@ -329,7 +342,6 @@ function BrokerProfilePage() {
     });
     const [isLoading, setIsLoading] = useState(true);
 
-    // ## NEW: State for Review Modal ##
     const [isReviewModalOpen, setReviewModalOpen] = useState(false);
     const [reviewRating, setReviewRating] = useState(0);
     const [reviewHoverRating, setReviewHoverRating] = useState(0);
@@ -337,7 +349,8 @@ function BrokerProfilePage() {
     const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
     const demand = state?.demand;
-    const API_URL = import.meta.env.VITE_API_URL.replace('/api', '');
+    
+    // (Removed API_URL from here)
 
     useEffect(() => {
         if (!user || !userId) return;
@@ -366,25 +379,19 @@ function BrokerProfilePage() {
     const handleUnhire = () => handleAction( () => apiClient.post(`/api/demands/${demand.demand_id}/unhire/${profile.user_id}`), 'Broker has been un-hired.', 'Failed to un-hire broker.', `/demand/${demand.demand_id}` );
     const handleMessage = async () => { try { const response = await apiClient.post(`/api/conversations`, { recipientId: profile.user_id }); navigate(`/chat/${response.data.conversation_id}`, { state: { partnerName: profile.full_name } }); } catch (error) { alert(error.response?.data?.message || "Could not start conversation."); } };
 
-    // ## --- UPDATED handleCompleteDeal FUNCTION --- ##
     const handleCompleteDeal = async () => {
         const confirmMsg = "Are you sure you want to mark this deal as complete? This will award 1 reputation point to the broker and mark the demand as 'completed'.";
         if (window.confirm(confirmMsg)) {
             try {
-                // 1. Call the backend to complete the deal and award the point
                 const response = await apiClient.post(`/api/demands/${demand.demand_id}/complete/${profile.user_id}`);
                 alert(response.data.message || 'Deal marked as complete!');
-                
-                // 2. NOW, open the review modal instead of navigating away
                 setReviewModalOpen(true);
-                
             } catch (error) {
                 alert(error.response?.data?.message || 'Failed to complete the deal.');
             }
         }
     };
     
-    // ## --- NEW REVIEW HANDLER FUNCTIONS --- ##
     const handleReviewSubmit = async () => {
         if (reviewRating === 0) {
             alert("Please select a star rating.");
@@ -393,14 +400,13 @@ function BrokerProfilePage() {
         setReviewSubmitting(true);
         try {
             await apiClient.post('/api/reviews', {
-                demand_id: demand.demand_id, // Link the review to this demand
-                reviewee_id: profile.user_id, // The ID of the person being reviewed (the broker)
+                demand_id: demand.demand_id,
+                reviewee_id: profile.user_id,
                 rating: reviewRating,
                 review_text: reviewText
             });
             alert("Review submitted successfully!");
-            closeReviewModal();
-            navigate('/my-demands'); // Navigate away *after* review is submitted
+            closeReviewModal(true); // Pass true to navigate
         } catch (error) {
             alert(error.response?.data?.message || "Failed to submit review.");
         } finally {
@@ -408,15 +414,15 @@ function BrokerProfilePage() {
         }
     };
 
-    const closeReviewModal = () => {
+    const closeReviewModal = useMemo(() => (didSubmit = false) => {
         setReviewModalOpen(false);
         setReviewRating(0);
         setReviewHoverRating(0);
         setReviewText('');
-        // We navigate away even if they skip, because the deal is complete
-        navigate('/my-demands'); 
-    };
-    // ## --- END NEW REVIEW HANDLER FUNCTIONS --- ##
+        if (didSubmit) {
+          navigate('/my-demands');
+        }
+    }, [navigate]); 
 
 
     if (isLoading || !profile) {
@@ -430,7 +436,8 @@ function BrokerProfilePage() {
             <PageHeader title={`${profile.role === 'broker' ? 'Broker' : 'Trader'} Profile`} backTo={-1} />
             <ProfileWrapper>
                 <ProfileCard>
-                    <Avatar src={profile.profile_photo_url ? `${API_URL}${profile.profile_photo_url}` : `https://ui-avatars.com/api/?name=${profile.full_name.replace(' ', '+')}`} />
+                    {/* ## --- THIS IS THE FIX (Line 1) --- ## */}
+                    <Avatar src={getAvatarUrl(profile.profile_photo_url, profile.full_name)} alt={profile.full_name} />
                     
                     <NameWrapper>
                       <Name>{profile.full_name}</Name>
@@ -471,7 +478,6 @@ function BrokerProfilePage() {
                                     <>
                                         <ActionButton $danger onClick={handleUnhire}><PiUserMinus /> Un-hire</ActionButton>
                                         <ActionButton onClick={handleMessage}><PiChatCircleDots /> Message</ActionButton>
-                                        {/* This button now triggers the review modal */}
                                         <CompleteButton onClick={handleCompleteDeal}><PiCheckCircle /> Mark Complete</CompleteButton>
                                     </>
                                 ) : (
@@ -506,9 +512,11 @@ function BrokerProfilePage() {
                             <ReviewCard key={review.review_id}>
                                 <ReviewHeader>
                                     <ReviewerInfo>
+                                        {/* ## --- THIS IS THE FIX (Line 2) --- ## */}
                                         <Avatar 
                                             style={{width: '40px', height: '40px'}}
-                                            src={review.reviewer_photo ? `${API_URL}${review.reviewer_photo}` : `https://ui-avatars.com/api/?name=${review.reviewer_name.replace(' ', '+')}`} 
+                                            src={getAvatarUrl(review.reviewer_photo, review.reviewer_name)} 
+                                            alt={review.reviewer_name}
                                         />
                                         <ReviewerName>{review.reviewer_name}</ReviewerName>
                                     </ReviewerInfo>
@@ -528,7 +536,6 @@ function BrokerProfilePage() {
                 </ReviewSection>
             </ProfileWrapper>
             
-            {/* ## --- NEW REVIEW MODAL ADDED --- ## */}
             {isReviewModalOpen && (
                 <ModalBackdrop>
                     <ModalContent>
@@ -542,7 +549,7 @@ function BrokerProfilePage() {
                                     <StarButton
                                         key={star}
                                         $filled={isFilled}
-                                        $animated={isFilled && star > reviewRating} // Animate new stars
+                                        $animated={isFilled && star > reviewRating}
                                         onClick={() => setReviewRating(star)}
                                         onMouseEnter={() => setReviewHoverRating(star)}
                                         onMouseLeave={() => setReviewHoverRating(0)}
@@ -560,16 +567,14 @@ function BrokerProfilePage() {
                         />
                         
                         <ModalActions>
-                            <ModalButton onClick={closeReviewModal}>Skip for Now</ModalButton>
-                            <ModalButton primary onClick={handleReviewSubmit} disabled={reviewSubmitting || reviewRating === 0}>
+                            <ModalButton onClick={() => closeReviewModal(false)}>Skip for Now</ModalButton>
+                            <ModalButton $primary onClick={handleReviewSubmit} disabled={reviewSubmitting || reviewRating === 0}>
                                 {reviewSubmitting ? 'Submitting...' : 'Submit Review'}
                             </ModalButton>
                         </ModalActions>
                     </ModalContent>
                 </ModalBackdrop>
             )}
-            {/* ## --- END NEW REVIEW MODAL --- ## */}
-
         </Container>
     );
 }

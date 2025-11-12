@@ -194,6 +194,10 @@ function AdminLayout() {
         <SidebarTitle>Diamond Connect</SidebarTitle>
         <StyledNavLink to="/admin" end>Dashboard</StyledNavLink>
         <StyledNavLink to="/admin/users">Manage Users</StyledNavLink>
+        
+        {/* ## --- THIS IS THE NEW LINE --- ## */}
+        <StyledNavLink to="/admin/user-monitoring">User Monitoring</StyledNavLink>
+        
         <StyledNavLink to="/admin/news">Manage News</StyledNavLink>
         
         {/* ## CHANGE: Added the LogoutButton component ## */}

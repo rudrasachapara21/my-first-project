@@ -1,7 +1,6 @@
 const { Pool } = require('pg');
 
 // Enforce that the DATABASE_URL is set.
-// This prevents the app from starting with a misconfigured database connection.
 if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL environment variable is not set.');
 }
@@ -11,23 +10,24 @@ const config = {
   connectionString: process.env.DATABASE_URL,
 };
 
-// In a production environment, it's a best practice to require SSL connections.
-// Many database providers (like Heroku, AWS RDS) require this.
-if (process.env.NODE_ENV === 'production') {
+// ## --- THIS IS THE FIX --- ##
+// Instead of checking NODE_ENV, we check if the URL is a Supabase URL.
+// Supabase requires SSL.
+if (process.env.DATABASE_URL.includes('supabase.co')) {
   config.ssl = {
     rejectUnauthorized: false,
   };
 }
+// ## --- END OF FIX --- ##
 
 const pool = new Pool(config);
 
 // --- DIAGNOSTIC LOG ---
 console.log('--- DATABASE CONNECTION CHECK ---');
-// Avoid logging the full connection string in production for security.
-if (process.env.NODE_ENV !== 'production') {
-    console.log(`Connecting with URL: ${config.connectionString}`);
+if (process.env.DATABASE_URL.includes('supabase.co')) {
+    console.log('Connecting to Supabase with SSL.');
 } else {
-    console.log('Connecting to the production database with SSL.');
+    console.log(`Connecting with URL: ${config.connectionString}`);
 }
 console.log('-----------------------------');
 
@@ -35,7 +35,6 @@ console.log('-----------------------------');
 // Listener for errors on idle clients in the pool.
 pool.on('error', (err) => {
   console.error('Unexpected error on idle PostgreSQL client', err);
-  // It's recommended to exit the process so a process manager can restart it.
   process.exit(-1);
 });
 
@@ -60,8 +59,6 @@ module.exports = {
 };
 
 // --- GRACEFUL SHUTDOWN ---
-// This ensures that when your application is shutting down,
-// it will close the database connections gracefully.
 const gracefulShutdown = () => {
   console.log('Shutting down gracefully...');
   pool.end().then(() => {

@@ -1,4 +1,12 @@
 require('dotenv').config();
+
+// ## --- DEBUG LINES --- ##
+// This will now print all three keys to your terminal
+console.log("SERVER STARTING - Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME);
+console.log("SERVER STARTING - API Key:", process.env.CLOUDINARY_API_KEY);
+console.log("SERVER STARTING - API Secret:", process.env.CLOUDINARY_API_SECRET);
+// ## --- END OF DEBUG LINES --- ##
+
 const http = require('http');
 const path = require('path');
 const express = require('express');
@@ -12,16 +20,17 @@ const app = express();
 const server = http.createServer(app);
 
 const websocket = require('./websocket');
+// We initialize Socket.IO, which will read the .env variable itself
 const io = websocket.init(server);
 
-app.use(cors());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const uploadDir = process.env.RENDER_DISK_PATH || 'uploads';
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
 app.use('/uploads', express.static(uploadDir));
 
 
@@ -45,8 +54,8 @@ const offerRoutes = require('./routes/offerRoutes.js');
 const notificationRoutes = require('./routes/notificationRoutes.js');
 const supportRoutes = require('./routes/supportRoutes.js');
 const pricingRoutes = require('./routes/pricingRoutes.js');
-// ## --- NEW ROUTE IMPORTED --- ##
 const reviewRoutes = require('./routes/reviewRoutes.js');
+const adminRoutes = require('./routes/adminRoutes.js');
 
 
 // --- API Endpoints ---
@@ -64,19 +73,8 @@ app.use('/api/offers', offerRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/pricing', pricingRoutes);
-// ## --- NEW ENDPOINT ADDED --- ##
 app.use('/api/reviews', reviewRoutes);
-
-
-// ## NEW SECTION: SERVE FRONTEND STATIC FILES ##
-const buildPath = path.join(__dirname, 'build');
-app.use(express.static(buildPath));
-
-
-// ## NEW SECTION: HANDLE ALL OTHER ROUTES FOR REACT ROUTER ##
-app.get('*', (req, res) => {
-    res.sendFile(path.join(buildPath, 'index.html'));
-});
+app.use('/api/admin', adminRoutes);
 
 
 // --- Error Handling ---

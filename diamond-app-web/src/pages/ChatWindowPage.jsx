@@ -3,7 +3,6 @@ import styled from 'styled-components';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import apiClient from '../api/axiosConfig';
 import PageHeader from '../components/PageHeader';
-// --- CHANGE 1: Imported new icons for attachments ---
 import { PiPaperPlaneRight, PiPaperclip, PiFile } from "react-icons/pi";
 import { useWebSocket } from '../context/WebSocketContext';
 import { useAuth } from '../context/AuthContext';
@@ -42,15 +41,28 @@ const HiddenFileInput = styled.input`
   display: none;
 `;
 
-// --- CHANGE 2: Created a new styled component for the clickable link ---
 const AttachmentLink = styled.a`
-  color: inherit; /* Inherits the white or black text color from the bubble */
+  color: inherit;
   text-decoration: underline;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 `;
+
+// --- NEW: Styled component for displaying images in chat ---
+const ChatImage = styled.img`
+  max-width: 100%;
+  border-radius: 10px;
+  margin-top: 5px;
+  cursor: pointer;
+`;
+
+// --- NEW: Helper function to check if a URL is an image ---
+const isImageUrl = (url) => {
+  if (!url) return false;
+  return /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+};
 
 function ChatWindowPage() {
   const { conversationId } = useParams();
@@ -61,9 +73,7 @@ function ChatWindowPage() {
   const [newMessage, setNewMessage] = useState('');
   const partnerName = location.state?.partnerName || 'Chat';
   const messageAreaRef = useRef(null);
-  const [isUploading, setIsUploading] = useState(false); // To disable input during upload
-
-  const API_ROOT_URL = import.meta.env.VITE_API_URL.replace('/api', '');
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (messageAreaRef.current) {
@@ -88,15 +98,24 @@ function ChatWindowPage() {
   useEffect(() => {
     if (!socket) return;
     
-    const handleNewMessage = (data) => {
+    const handleNewTextMessage = (data) => {
+        if (data.conversationId === parseInt(conversationId, 10)) {
+            setMessages(prevMessages => [...prevMessages, data.message]);
+        }
+    };
+
+    const handleNewFileMessage = (data) => {
         if (data.conversation_id === parseInt(conversationId, 10)) {
             setMessages(prevMessages => [...prevMessages, data]);
         }
     };
 
-    socket.on('new_message', handleNewMessage);
+    socket.on('NEW_MESSAGE', handleNewTextMessage);
+    socket.on('new_message', handleNewFileMessage);
+    
     return () => {
-      socket.off('new_message', handleNewMessage);
+      socket.off('NEW_MESSAGE', handleNewTextMessage);
+      socket.off('new_message', handleNewFileMessage);
     };
   }, [socket, conversationId]);
 
@@ -109,16 +128,7 @@ function ChatWindowPage() {
       content: newMessage,
     };
     
-    sendMessage('send_message', messageData);
-
-    const sentMessage = {
-      conversation_id: parseInt(conversationId, 10),
-      sender_id: user.id,
-      content: newMessage,
-      sent_at: new Date().toISOString()
-    };
-    setMessages(prev => [...prev, sentMessage]);
-    
+    sendMessage('SEND_MESSAGE', messageData);
     setNewMessage('');
   };
 
@@ -134,7 +144,6 @@ function ChatWindowPage() {
       await apiClient.post(`/api/conversations/${conversationId}/documents`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      // The websocket will now handle showing the new message, so no alert is needed.
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to upload file.');
     } finally {
@@ -154,17 +163,33 @@ function ChatWindowPage() {
         <MessageArea ref={messageAreaRef}>
           {messages.map((msg, index) => {
             const sent = String(msg.sender_id) === String(user.id);
+            
+            // --- NEW: Check if the attachment is an image ---
+            const isImage = isImageUrl(msg.attachment_url);
+
             return (
               <MessageWrapper key={msg.message_id || `msg-${index}`} $sent={sent}>
                 <MessageBubble $sent={sent}>
-                  {/* --- CHANGE 3: Conditionally render a link or plain text --- */}
+                  
+                  {/* --- THIS IS THE FIX --- */}
                   {msg.attachment_url ? (
-                    <AttachmentLink href={`${API_ROOT_URL}${msg.attachment_url}`} target="_blank" rel="noopener noreferrer">
-                      <PiFile /> {msg.content.replace('📎 Document:', '').trim()}
-                    </AttachmentLink>
+                    isImage ? (
+                      // If it's an image, render an <img> tag
+                      <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer">
+                        <ChatImage src={msg.attachment_url} alt="Shared image" />
+                      </a>
+                    ) : (
+                      // If it's not an image, render the file link
+                      <AttachmentLink href={msg.attachment_url} target="_blank" rel="noopener noreferrer">
+                        <PiFile /> {msg.content.replace('📎 Document:', '').trim()}
+                      </AttachmentLink>
+                    )
                   ) : (
+                    // If no attachment, just show the text content
                     msg.content
                   )}
+                  {/* --- END OF FIX --- */}
+
                 </MessageBubble>
                 <Timestamp $sent={sent}>{new Date(msg.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Timestamp>
               </MessageWrapper>
@@ -179,7 +204,7 @@ function ChatWindowPage() {
 
           <MessageInput
             value={newMessage}
-            onChange={e => setNewMessage(e.target.value)}
+            onChange={e => setNewMessage(e.g.target.value)}
             placeholder={isUploading ? "Uploading file..." : "Type a message..."}
             disabled={!socket || !socket.connected || isUploading}
           />

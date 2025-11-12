@@ -8,38 +8,28 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
-  // Start isLoading as true
   const [isLoading, setIsLoading] = useState(true);
 
-  // This effect checks for a saved session when the app loads
   useEffect(() => {
     try {
       const storedToken = localStorage.getItem('token');
       const storedUser = localStorage.getItem('user');
       
       if (storedToken && storedUser) {
-        // 1. Set the token in state
         setToken(storedToken);
-        
-        // 2. Set the token in axios for all future requests
-        // This is the fix for initial page loads
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-        
-        // 3. Set the user in state
         setUser(JSON.parse(storedUser));
       }
     } catch (error) {
       console.error("Error initializing auth from localStorage:", error);
-      // If error, clear everything
       localStorage.clear();
       setToken(null);
       setUser(null);
       delete apiClient.defaults.headers.common['Authorization'];
     } finally {
-      // Whether we succeeded or failed, we are done loading.
       setIsLoading(false);
     }
-  }, []); // Empty dependency array means this runs only once on app start
+  }, []);
 
   const login = async (email, password, role) => {
     try {
@@ -54,7 +44,6 @@ export const AuthProvider = ({ children }) => {
         
         setToken(token);
         setUser(userData);
-        // Also set the token in axios headers *during* login
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         
         localStorage.setItem('token', token);
@@ -72,15 +61,29 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setToken(null);
     setUser(null);
-    
-    // Also remove the token from axios headers *during* logout
     delete apiClient.defaults.headers.common['Authorization'];
-
     localStorage.removeItem('token');
     localStorage.removeItem('user');
   };
 
-  const value = { user, token, isLoading, login, logout };
+  // ## --- THIS IS THE NEW FUNCTION --- ##
+  /**
+   * Updates the user object in both React state and localStorage.
+   * @param {object} newUserData - The new user data object from the API.
+   */
+  const updateUser = (newUserData) => {
+    // 1. Merge new data with old data, in case the API only returns some fields
+    const updatedUser = { ...user, ...newUserData };
+    
+    // 2. Update the React state immediately
+    setUser(updatedUser);
+    
+    // 3. Update localStorage so it's correct on next page load
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+  };
+
+  // ## --- ADD 'updateUser' TO THE VALUE --- ##
+  const value = { user, token, isLoading, login, logout, updateUser };
 
   return (
     <AuthContext.Provider value={value}>

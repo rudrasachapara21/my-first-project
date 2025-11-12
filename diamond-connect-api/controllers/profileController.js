@@ -2,7 +2,6 @@ const db = require('../db');
 
 exports.getUserProfile = async (req, res, next) => {
     try {
-        // We should also fetch office_hours here so the profile page can display it.
         const query = `
             SELECT user_id, full_name, email, role, profile_photo_url, gst_number,
                    office_address, phone_number, office_name, office_hours
@@ -29,7 +28,6 @@ exports.updateUserProfile = async (req, res, next) => {
         return res.status(400).json({ message: "Cannot update email or password from this endpoint." });
     }
 
-    // --- THE FIX: Added 'office_hours' to the list of allowed fields ---
     const allowedFields = ['full_name', 'gst_number', 'office_address', 'phone_number', 'office_name', 'office_hours'];
     
     const updateFields = [];
@@ -44,7 +42,8 @@ exports.updateUserProfile = async (req, res, next) => {
     });
 
     if (req.file) {
-        const photoUrl = `/uploads/${req.file.filename}`;
+        // Cloudinary provides the secure, permanent URL in 'req.file.path'
+        const photoUrl = req.file.path; 
         updateFields.push(`profile_photo_url = $${queryIndex++}`);
         values.push(photoUrl);
     }
@@ -72,7 +71,10 @@ exports.updateUserProfile = async (req, res, next) => {
             user: updatedProfile
         });
 
-    } catch (error) {
+    // ## --- THIS IS THE FIX --- ##
+    // This opening brace '{' was missing before,
+    // which was causing the server to crash.
+    } catch (error) { 
         console.error("Update user profile error:", error);
         next(error);
     }

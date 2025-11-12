@@ -1,63 +1,79 @@
 const multer = require('multer');
-// --- THE FIX: Correctly import the 'path' and 'fs' modules ---
-const path = require('path');
-const fs = require('fs');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('cloudinary').v2;
 
-// Use the Render Disk path in production, or a local folder for development
-const uploadDir = process.env.RENDER_DISK_PATH || 'uploads';
+// Configure Cloudinary with the keys from your .env file (or Render env)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-// Ensure the upload directory exists on startup
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
+// Configure storage for PROFILE PHOTOS
+const profilePhotoStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'diamond-connect/profile-photos',
+    allowed_formats: ['jpg', 'png', 'jpeg'],
+    transformation: [{ width: 300, height: 300, crop: 'fill' }]
+  },
+});
 
-// Configure the general storage engine
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        // All files will now go to the permanent disk path on Render
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        // Create a unique filename
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const extension = path.extname(file.originalname);
-        cb(null, file.fieldname + '-' + uniqueSuffix + extension);
-    }
+// Configure storage for LISTING IMAGES
+const listingImageStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'diamond-connect/listing-images',
+    allowed_formats: ['jpg', 'png', 'jpeg'],
+    transformation: [{ width: 800, height: 800, crop: 'limit' }]
+  },
+});
+
+// ## --- NEW: Configure storage for CHAT DOCUMENTS --- ##
+const documentStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'diamond-connect/chat-documents',
+    // We set 'resource_type: "auto"' to allow any file type (images, PDFs, etc.)
+    resource_type: 'auto',
+  },
 });
 
 // A specific filter for IMAGES ONLY
 const imageFileFilter = (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-        cb(null, true);
-    } else {
-        cb(new Error('Not an image! Please upload only image files.'), false);
-    }
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Not an image! Please upload only image files.'), false);
+  }
 };
 
-// A separate multer instance for generic documents (no file filter)
-const documentUpload = multer({
-    storage: storage,
-    limits: {
-        fileSize: 1024 * 1024 * 10 // 10 MB limit for documents
-    }
+// Create the multer upload instances
+const uploadProfilePhoto = multer({
+  storage: profilePhotoStorage,
+  fileFilter: imageFileFilter,
+  limits: { fileSize: 1024 * 1024 * 5 } // 5 MB limit
 });
 
-// The original multer instance, specifically for images
-const imageUpload = multer({
-    storage: storage,
-    fileFilter: imageFileFilter,
-    limits: {
-        fileSize: 1024 * 1024 * 5 // 5 MB limit for images
-    }
+const uploadListingImages = multer({
+  storage: listingImageStorage,
+  fileFilter: imageFileFilter,
+  limits: { fileSize: 1024 * 1024 * 5 } // 5 MB limit
+});
+
+// ## --- NEW: The uploader for chat documents --- ##
+const uploadDocument = multer({
+  storage: documentStorage,
+  limits: { fileSize: 1024 * 1024 * 10 } // 10 MB limit for any file
 });
 
 module.exports = {
-    // For secure documents in chat (field name 'document')
-    uploadDocument: documentUpload,
-    
-    // For profile photos (field name 'profilePhoto')
-    uploadProfilePhoto: imageUpload.single('profilePhoto'),
+  // For profile photos (field name 'profilePhoto')
+  uploadProfilePhoto: uploadProfilePhoto.single('profilePhoto'),
 
-    // For listing images (field name 'listingImages')
-    uploadListingImages: imageUpload.array('listingImages', 5)
+  // For listing images (field name 'listingImages')
+  uploadListingImages: uploadListingImages.array('listingImages', 5),
+  
+  // ## --- NEW: Export the document uploader --- ##
+  uploadDocument: uploadDocument.single('document')
 };
