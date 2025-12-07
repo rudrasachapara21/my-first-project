@@ -1,10 +1,10 @@
 require('dotenv').config();
 
 // ## --- DEBUG LINES --- ##
-// This will now print all three keys to your terminal
 console.log("SERVER STARTING - Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME);
-console.log("SERVER STARTING - API Key:", process.env.CLOUDINARY_API_KEY);
-console.log("SERVER STARTING - API Secret:", process.env.CLOUDINARY_API_SECRET);
+console.log("SERVER STARTING - API Key:", process.env.CLOUDINARY_API_KEY ? "Set" : "Not Set"); 
+// Hiding secret for security in logs, just checking if it exists
+console.log("SERVER STARTING - API Secret:", process.env.CLOUDINARY_API_SECRET ? "Set" : "Not Set");
 // ## --- END OF DEBUG LINES --- ##
 
 const http = require('http');
@@ -20,19 +20,21 @@ const app = express();
 const server = http.createServer(app);
 
 const websocket = require('./websocket');
-// We initialize Socket.IO, which will read the .env variable itself
 const io = websocket.init(server);
 
 app.use(cors({
-  origin: process.env.CORS_ORIGIN
+  origin: process.env.CORS_ORIGIN || '*' // Fallback to * if env is missing
 }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const uploadDir = process.env.RENDER_DISK_PATH || 'uploads';
+// Ensure upload directory exists to prevent startup errors
+if (!fs.existsSync(uploadDir)){
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
 app.use('/uploads', express.static(uploadDir));
-
 
 app.use((req, res, next) => {
     req.io = io;
@@ -77,15 +79,26 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/admin', adminRoutes);
 
 
-// --- Error Handling ---
+// --- Improved Error Handling ---
+
+// 1. Handle 404 (Not Found)
 app.use((req, res, next) => {
-    const error = new Error('Not Found');
+    // We include the URL so you know WHAT was not found
+    const error = new Error(`Not Found - ${req.originalUrl}`);
     error.status = 404;
     next(error);
 });
 
+// 2. Global Error Handler
 app.use((err, req, res, next) => {
-    console.error("An error occurred:", err.stack);
+    // If it's a 404, just warn (don't clutter logs with stack traces)
+    if (err.status === 404) {
+        console.warn(`[404] ${err.message}`);
+    } else {
+        // If it's a real server error (500), log the full stack
+        console.error("SERVER ERROR:", err);
+    }
+
     res.status(err.status || 500).json({
         message: err.message || 'An internal server error occurred.'
     });
