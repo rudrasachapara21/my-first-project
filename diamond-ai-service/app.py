@@ -11,48 +11,46 @@ CORS(app)
 
 # --- UNIVERSAL PATH SETUP ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Define expected paths
 ZIP_PATH = os.path.join(BASE_DIR, 'diamond_model.zip')
-DEFAULT_MODEL_PATH = os.path.join(BASE_DIR, 'diamond_model.pkl')
 
 print(f"--- SERVER STARTUP ---")
 print(f"Running in directory: {BASE_DIR}")
 
 # --- STEP 1: HANDLE ZIP FILE ---
 if os.path.exists(ZIP_PATH):
-    print(f"Found zip file at {ZIP_PATH}. Attempting to extract...")
+    print(f"Found zip file at {ZIP_PATH}. Extracting...")
     try:
         with zipfile.ZipFile(ZIP_PATH, 'r') as zip_ref:
-            # Print files inside zip for debugging
+            # Debug: Print what is inside so we know exactly
             print(f"Files inside zip: {zip_ref.namelist()}")
             zip_ref.extractall(BASE_DIR)
         print("Extraction complete.")
     except Exception as e:
-        print(f"Note: Zip extraction skipped or failed: {e}")
+        print(f"Zip extraction note: {e}")
 
-# --- STEP 2: SUPER SEARCH FOR MODEL FILE ---
-# We use os.walk to look into ALL subfolders recursively
+# --- STEP 2: FIND THE MODEL FILE (SMART SEARCH) ---
 final_model_path = None
 
-print("Searching for .pkl files in all subdirectories...")
+print("Searching for model file...")
 
 for root, dirs, files in os.walk(BASE_DIR):
     for file in files:
-        if file.endswith(".pkl") and not file.startswith("._"): # Ignore Mac hidden files
+        # CHECK: Does the filename contain "diamond_model"?
+        # This will catch "diamond_model.pkl", "diamond_model.pkl copy", etc.
+        if "diamond_model" in file and not file.endswith(".zip"):
             full_path = os.path.join(root, file)
-            # Check file size to avoid empty corrupt files
-            if os.path.getsize(full_path) > 1000: # Bigger than 1KB
+            
+            # Verify it's not a tiny system file (must be > 1KB)
+            if os.path.getsize(full_path) > 1000:
                 final_model_path = full_path
-                print(f"FOUND MODEL AT: {final_model_path}")
+                print(f"✅ FOUND MODEL AT: {final_model_path}")
                 break
     if final_model_path:
         break
 
 if not final_model_path:
-    print("❌ CRITICAL ERROR: Could not find any .pkl file in extracted folders.")
-    # Debug: List all files so we can see what happened
-    print("Listing all files on server:")
+    print("❌ CRITICAL ERROR: Could not find any model file.")
+    # Debug listing
     for root, dirs, files in os.walk(BASE_DIR):
         for file in files:
             print(os.path.join(root, file))
@@ -72,8 +70,8 @@ else:
 # --- ROUTES ---
 @app.route('/')
 def home():
-    status = "AI System Online" if model else "AI System Offline (Model Missing)"
-    return f"Diamond AI Pricing Service: {status}"
+    status = "Online" if model else "Offline (Model Missing)"
+    return f"Diamond AI Service Status: {status}"
 
 @app.route('/health', methods=['GET'])
 def health_check():
