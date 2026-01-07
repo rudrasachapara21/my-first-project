@@ -122,6 +122,22 @@ def clean_text(text):
 def home():
     return "Diamond AI Service (Training + Prediction + PDF) Online"
 
+
+@app.route('/health')
+def health():
+    """Health endpoint for orchestration / load balancers.
+    Returns model_loaded flag and basic uptime info.
+    """
+    try:
+        model_loaded = model is not None
+        return jsonify({
+            'status': 'ok',
+            'model_loaded': model_loaded
+        })
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        return jsonify({'status': 'error'}), 500
+
 # ✅ ROUTE 1: MANUAL PRICING (Restored)
 @app.route('/predict', methods=['POST'])
 def predict():

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { PiPlusCircle, PiBinoculars, PiStorefront, PiTag } from "react-icons/pi";
+import GlassCard from '../components/GlassCard';
 import apiClient from '../api/axiosConfig';
 import { useAuth } from '../context/AuthContext';
 import AppHeader from '../components/AppHeader';
@@ -16,15 +17,14 @@ const NavGrid = styled.main`
   padding: 0 1.5rem 1.5rem 1.5rem;
 `;
 
-const NavCard = styled.div`
-  background: ${props => props.$primary ? props.theme.accentPrimary : props.theme.bgSecondary};
-  color: ${props => props.$primary ? '#FFFFFF' : props.theme.textPrimary};
+const NavCard = styled(GlassCard)`
+  background: ${props => props.$primary ? (props.theme.primaryGradient || props.theme.accentPrimary) : props.theme.surfaceGlass};
+  color: ${props => props.$primary ? props.theme.textMain : props.theme.textPrimary};
   border-radius: 16px;
   padding: ${props => props.$primary ? '2rem' : '1.25rem'};
   cursor: pointer;
   display: flex;
   align-items: center;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
   transition: transform 0.1s ease-in-out;
   
   &:active { transform: scale(0.97); }

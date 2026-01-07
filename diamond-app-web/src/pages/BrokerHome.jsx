@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/axiosConfig';
-import { PiHandWaving, PiDiamond } from "react-icons/pi";
+import { PiHandWaving, PiDiamond, PiCheckCircle } from "react-icons/pi";
 import { useAuth } from '../context/AuthContext';
 import { useWebSocket } from '../context/WebSocketContext';
 import AppHeader from '../components/AppHeader';
 import DashboardSummary from '../components/DashboardSummary';
 import { SkeletonDemandCard } from '../components/SkeletonCard';
 
-// ... (All your styled-components are the same, no changes needed) ...
+// ... (Styles) ...
 const Container = styled.div` font-family: 'Inter', sans-serif; `;
 const SectionTitle = styled.h2`
   font-family: 'Clash Display', sans-serif;
@@ -84,8 +84,9 @@ const RaiseHandButton = styled.button`
   padding: 0.6rem 1.2rem;
   border-radius: 8px;
   border: none;
-  background: ${props => (props.disabled ? props.theme.borderColor : props.theme.accentPrimary)};
+  background: ${props => (props.disabled ? props.theme.bgPrimary : props.theme.accentPrimary)};
   color: ${props => (props.disabled ? props.theme.textSecondary : 'white')};
+  border: 1px solid ${props => (props.disabled ? props.theme.borderColor : 'transparent')};
   cursor: ${props => (props.disabled ? 'not-allowed' : 'pointer')};
   font-weight: 700;
   display: flex;
@@ -97,7 +98,6 @@ const RaiseHandButton = styled.button`
     transform: ${props => (props.disabled ? 'none' : 'scale(0.97)')};
   }
 `;
-
 
 function BrokerHome() {
   const navigate = useNavigate();
@@ -111,8 +111,6 @@ function BrokerHome() {
   useEffect(() => {
     if (!user) return;
 
-    // --- CACHING FIX: STEP 1 ---
-    // Try to load cached data immediately to make the app feel fast
     try {
       const cachedDemands = localStorage.getItem('cachedDemands');
       const cachedInterests = localStorage.getItem('cachedInterests');
@@ -122,17 +120,15 @@ function BrokerHome() {
         setDemands(JSON.parse(cachedDemands));
         setRaisedHands(new Set(JSON.parse(cachedInterests)));
         setSummaryStats(JSON.parse(cachedStats));
-        setIsLoading(false); // We have data, so we're not "loading"
+        setIsLoading(false); 
       } else {
-        setIsLoading(true); // No cache, so we ARE loading
+        setIsLoading(true); 
       }
     } catch (e) {
       console.error("Failed to load from cache", e);
-      setIsLoading(true); // Fail safe, just load normally
+      setIsLoading(true); 
     }
 
-    // --- CACHING FIX: STEP 2 ---
-    // Always fetch fresh data from the network in the background
     const fetchData = async () => {
       try {
         const [demandsRes, interestsRes, statsRes] = await Promise.all([
@@ -141,18 +137,14 @@ function BrokerHome() {
             apiClient.get('/api/stats/summary')
         ]);
         
-        // Prepare data for state and cache
         const demandsData = demandsRes.data;
-        const interestsData = Array.from(interestsRes.data); // Convert Set to Array for storage
+        const interestsData = Array.from(interestsRes.data); 
         const statsData = statsRes.data;
 
-        // Update state with fresh data
         setDemands(demandsData);
         setRaisedHands(new Set(interestsData));
         setSummaryStats(statsData);
 
-        // --- CACHING FIX: STEP 3 ---
-        // Save the fresh data to the cache for the next visit
         localStorage.setItem('cachedDemands', JSON.stringify(demandsData));
         localStorage.setItem('cachedInterests', JSON.stringify(interestsData));
         localStorage.setItem('cachedStats', JSON.stringify(statsData));
@@ -160,7 +152,6 @@ function BrokerHome() {
       } catch (error) {
         console.error("Failed to fetch broker data:", error);
       } finally {
-        // Only set loading to false if we didn't have cache to begin with
         if (!localStorage.getItem('cachedDemands')) {
           setIsLoading(false);
         }
@@ -178,7 +169,6 @@ function BrokerHome() {
         }
         setDemands(prevDemands => {
           const newDemands = [newDemand, ...prevDemands];
-          // Also update cache when websocket gets data
           localStorage.setItem('cachedDemands', JSON.stringify(newDemands));
           return newDemands;
         });
@@ -190,17 +180,29 @@ function BrokerHome() {
     }
   }, [socket]);
 
+  // --- FIXED HANDLER ---
   const handleRaiseHand = async (e, demandId) => {
     e.stopPropagation();
     if (raisedHands.has(demandId)) return;
+    
     try {
-        await apiClient.post(`/api/demands/${demandId}/interest`);
+        // Updated to use the new 'raise-hand' endpoint
+        await apiClient.post(`/api/demands/${demandId}/raise-hand`);
+        
         setRaisedHands(prev => {
-          const newRaisedHands = new Set(prev).add(demandId);
-          // Also update cache
+          const newRaisedHands = new Set(prev);
+          newRaisedHands.add(demandId);
           localStorage.setItem('cachedInterests', JSON.stringify(Array.from(newRaisedHands)));
           return newRaisedHands;
         });
+        
+        // Optional: Update interest count locally for immediate feedback
+        setDemands(prev => prev.map(d => 
+            d.demand_id === demandId 
+            ? { ...d, interest_count: (parseInt(d.interest_count) || 0) + 1 } 
+            : d
+        ));
+
     } catch (error) {
         alert(error.response?.data?.message || "An error occurred.");
     }
@@ -233,14 +235,17 @@ function BrokerHome() {
                     </DetailItem>
                     <DetailItem>
                       <DetailLabel>Price/ct</DetailLabel>
-                      <DetailValue>${d.price_per_caret || '-'}</DetailValue>
+                      <DetailValue>₹{d.price_per_caret || '-'}</DetailValue>
                     </DetailItem>
                   </DemandDetailGrid>
                   <CardFooter>
                     <InterestCount><strong>{demand.interest_count || 0}</strong> Brokers Interested</InterestCount>
-                    <RaiseHandButton onClick={(e) => handleRaiseHand(e, demand.demand_id)} disabled={hasRaisedHand} >
-                      <PiHandWaving size={16} />
-                      {hasRaisedHand ? 'Interest Shown' : 'Show Interest'}
+                    <RaiseHandButton 
+                      onClick={(e) => handleRaiseHand(e, demand.demand_id)} 
+                      disabled={hasRaisedHand} 
+                    >
+                      {hasRaisedHand ? <PiCheckCircle size={16} /> : <PiHandWaving size={16} />}
+                      {hasRaisedHand ? 'Hand Raised' : 'Raise Hand'}
                     </RaiseHandButton>
                   </CardFooter>
                 </DemandCard>

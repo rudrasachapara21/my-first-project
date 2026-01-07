@@ -1,6 +1,7 @@
-const db = require('../db');
+const db = require('../db'); // Ensure this points to your DB connection
 const { createNotification } = require('../services/notificationService');
 
+// --- 1. MAKE AN OFFER (Start the Negotiation) ---
 exports.createOffer = async (req, res, next) => {
     const { listingId } = req.params;
     const { offer_price } = req.body;
@@ -10,41 +11,61 @@ exports.createOffer = async (req, res, next) => {
     try {
         await client.query('BEGIN');
 
-        const listingQuery = 'SELECT trader_id, diamond_details FROM listings WHERE listing_id = $1';
+        // A. Fetch listing details
+        const listingQuery = 'SELECT user_id, shape, carat, clarity, cut, status FROM listings WHERE listing_id = $1';
         const listingResult = await client.query(listingQuery, [listingId]);
+        
         if (listingResult.rowCount === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ message: 'Listing not found.' });
         }
-        const sellerId = listingResult.rows[0].trader_id;
         
-        const details = listingResult.rows[0].diamond_details;
-        const listingName = `${details.carat || '?'}ct ${details.clarity || ''} ${details.cut || ''}` || `Listing #${listingId}`;
+        const listingData = listingResult.rows[0];
+        const sellerId = listingData.user_id;
+        const listingName = `${listingData.carat}ct ${listingData.shape} (${listingData.clarity})`;
 
+        // B. Validations
         if (buyerId === sellerId) {
+            await client.query('ROLLBACK');
             return res.status(400).json({ message: 'You cannot make an offer on your own listing.' });
         }
+        if (listingData.status !== 'active') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Listing is not active.' });
+        }
 
-        const buyerQuery = 'SELECT full_name FROM users WHERE user_id = $1';
-        const buyerResult = await client.query(buyerQuery, [buyerId]);
-        const buyerName = buyerResult.rows[0].full_name;
-
+        // C. Create the Offer
         const offerQuery = `
             INSERT INTO offers (listing_id, buyer_id, seller_id, offer_price, status)
             VALUES ($1, $2, $3, $4, 'pending_seller') RETURNING *
         `;
         const { rows } = await client.query(offerQuery, [listingId, buyerId, sellerId, offer_price]);
         const newOffer = rows[0];
+
+        // 🆕 D. LOG HISTORY (The Negotiation Dance)
+        await client.query(
+            `INSERT INTO offer_history (offer_id, changed_by_user_id, previous_price, new_price, status_change)
+             VALUES ($1, $2, NULL, $3, 'created')`,
+            [newOffer.offer_id, buyerId, offer_price]
+        );
+
+        // 🆕 E. LOG ACTIVITY (Security)
+        await client.query(
+            `INSERT INTO activity_logs (user_id, action_type, target_id, details, ip_address)
+             VALUES ($1, 'CREATE_OFFER', $2, $3, $4)`,
+            [buyerId, newOffer.offer_id, `Offered ₹${offer_price} for Listing #${listingId}`, req.ip]
+        );
+        
+        // F. Notify Seller
+        const buyerNameResult = await client.query('SELECT full_name FROM users WHERE user_id = $1', [buyerId]);
+        const buyerName = buyerNameResult.rows[0].full_name;
         
         const message = `${buyerName} made an offer of ₹${offer_price} on your listing: ${listingName}`;
-        const linkUrl = `/offers`;
-        const newNotification = await createNotification(client, sellerId, message, linkUrl);
+        const newNotification = await createNotification(client, sellerId, message, `/offers`);
         
         if (req.io) {
             const sellerSocketId = sellerId.toString();
-            req.io.to(sellerSocketId).emit('new_offer', {
-                message: `You have a new offer on ${listingName}`,
-                offer: newOffer
-            });
+            req.io.to(sellerSocketId).emit('new_offer', { message, offer: newOffer });
             req.io.to(sellerSocketId).emit('new_notification', newNotification);
         }
         
@@ -58,11 +79,15 @@ exports.createOffer = async (req, res, next) => {
     }
 };
 
+// --- 2. GET OFFERS (For Dashboard) ---
 exports.getReceivedOffers = async (req, res, next) => {
     const userId = req.user.user_id;
     try {
         const query = `
-            SELECT o.*, l.diamond_details, l.image_urls, u.full_name as buyer_name
+            SELECT o.*, 
+                   l.shape, l.carat, l.color, l.clarity, l.cut, l.image_urls, 
+                   l.status AS listing_status,
+                   u.full_name as buyer_name
             FROM offers o
             JOIN listings l ON o.listing_id = l.listing_id
             JOIN users u ON o.buyer_id = u.user_id
@@ -80,7 +105,10 @@ exports.getMadeOffers = async (req, res, next) => {
     const userId = req.user.user_id;
     try {
         const query = `
-            SELECT o.*, l.diamond_details, l.image_urls, u.full_name as seller_name
+            SELECT o.*, 
+                   l.shape, l.carat, l.color, l.clarity, l.cut, l.image_urls, 
+                   l.status AS listing_status,
+                   u.full_name as seller_name
             FROM offers o
             JOIN listings l ON o.listing_id = l.listing_id
             JOIN users u ON o.seller_id = u.user_id
@@ -94,101 +122,139 @@ exports.getMadeOffers = async (req, res, next) => {
     }
 };
 
+// --- 3. RESPOND TO OFFER (The "Power" Function) ---
 exports.respondToOffer = async (req, res, next) => {
     const { offerId } = req.params;
-    const { responseType, newPrice } = req.body; // responseType: 'accept', 'reject', or 'counter'
+    const { responseType, newPrice } = req.body; 
     const userId = req.user.user_id;
     
     const client = await db.connect();
     try {
         await client.query('BEGIN');
 
-        // 1. Get the current offer and verify the user
+        // A. Get details (Locked for update)
         const offerQuery = `
-            SELECT o.*, l.diamond_details, u_buyer.full_name as buyer_name, u_seller.full_name as seller_name
+            SELECT o.*, l.price as original_listing_price,
+                   u_buyer.full_name as buyer_name, u_seller.full_name as seller_name
             FROM offers o
             JOIN listings l ON o.listing_id = l.listing_id
             JOIN users u_buyer ON o.buyer_id = u_buyer.user_id
             JOIN users u_seller ON o.seller_id = u_seller.user_id
             WHERE o.offer_id = $1
+            FOR UPDATE
         `;
         const { rows: offerRows } = await client.query(offerQuery, [offerId]);
         if (offerRows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ message: 'Offer not found.' });
         }
-
         const offer = offerRows[0];
-        const details = offer.diamond_details;
-        const listingName = `${details.carat || '?'}ct ${details.clarity || ''}` || `Listing #${offer.listing_id}`;
 
-        // 2. Authorization: Check if it's this user's turn to respond
-        if (offer.status === 'pending_seller' && userId !== offer.seller_id) {
-            return res.status(403).json({ message: 'Forbidden: It is the seller\'s turn to respond.' });
-        }
-        
-        if (offer.status === 'pending_buyer' && userId !== offer.buyer_id) {
-            return res.status(403).json({ message: 'Forbidden: It is the buyer\'s turn to respond.' });
-        }
-        
-        if (offer.status === 'accepted' || offer.status === 'rejected') {
-             return res.status(400).json({ message: 'This offer is already closed.' });
-        }
-
+        // B. Logic Split
         let updatedOffer;
         let notificationMessage = '';
-        let notificationRecipientId;
+        let recipientId = (userId === offer.seller_id) ? offer.buyer_id : offer.seller_id;
 
-        // 3. Handle the response logic
+        // =================================================
+        // OPTION 1: ACCEPT (Create Transaction & Close Deal)
+        // =================================================
         if (responseType === 'accept') {
+            
+            // 1. Update Offer Status
             const updateOfferQuery = `UPDATE offers SET status = 'accepted', updated_at = NOW() WHERE offer_id = $1 RETURNING *`;
             updatedOffer = (await client.query(updateOfferQuery, [offerId])).rows[0];
 
-            await client.query(`UPDATE listings SET status = 'sold' WHERE listing_id = $1`, [offer.listing_id]);
-            await client.query(`UPDATE offers SET status = 'rejected' WHERE listing_id = $1 AND offer_id != $2 AND status LIKE 'pending_%'`, [offer.listing_id, offerId]);
+            // 2. Reject all other offers for this listing (Clean up)
+            await client.query(`UPDATE offers SET status = 'rejected' WHERE listing_id = $1 AND offer_id != $2`, [offer.listing_id, offerId]);
 
-            notificationRecipientId = (userId === offer.seller_id) ? offer.buyer_id : offer.seller_id;
-            notificationMessage = `Your offer for "${listingName}" has been accepted!`;
+            // 3. Mark Listing as SOLD
+            await client.query(`
+                UPDATE listings 
+                SET status = 'sold', 
+                    buyer_id = $1, 
+                    final_price = $2, 
+                    sold_at = NOW()
+                WHERE listing_id = $3
+            `, [offer.buyer_id, offer.offer_price, offer.listing_id]);
 
-        } else if (responseType === 'reject') {
-            const updateOfferQuery = `UPDATE offers SET status = 'rejected', updated_at = NOW() WHERE offer_id = $1 RETURNING *`;
-            updatedOffer = (await client.query(updateOfferQuery, [offerId])).rows[0];
+            // 🆕 4. CREATE TRANSACTION (The Bank Record)
+            const transResult = await client.query(`
+                INSERT INTO transactions 
+                (listing_id, buyer_id, seller_id, final_amount, payment_status, notes)
+                VALUES ($1, $2, $3, $4, 'pending', 'Deal closed via Offer System')
+                RETURNING transaction_id
+            `, [offer.listing_id, offer.buyer_id, offer.seller_id, offer.offer_price]);
+            
+            const transactionId = transResult.rows[0].transaction_id;
 
-            notificationRecipientId = (userId === offer.seller_id) ? offer.buyer_id : offer.seller_id;
-            notificationMessage = `Your offer for "${listingName}" was rejected.`;
+            // 🆕 5. LOG HISTORY
+            await client.query(
+                `INSERT INTO offer_history (offer_id, changed_by_user_id, previous_price, new_price, status_change)
+                 VALUES ($1, $2, $3, $3, 'accepted')`,
+                [offerId, userId, offer.offer_price]
+            );
+
+            // 🆕 6. LOG ACTIVITY
+            await client.query(
+                `INSERT INTO activity_logs (user_id, action_type, target_id, details, ip_address)
+                 VALUES ($1, 'ACCEPT_OFFER', $2, $3, $4)`,
+                [userId, transactionId, `Sold Listing #${offer.listing_id} for ₹${offer.offer_price}`, req.ip]
+            );
+
+            notificationMessage = `🎉 Your offer of ₹${offer.offer_price} was ACCEPTED! Transaction #${transactionId} created.`;
         
-        } else if (responseType === 'counter') {
-            if (!newPrice || isNaN(newPrice) || newPrice <= 0) {
-                return res.status(400).json({ message: 'A valid new price is required for a counter-offer.' });
+        } 
+        // =================================================
+        // OPTION 2: REJECT
+        // =================================================
+        else if (responseType === 'reject') {
+            updatedOffer = (await client.query(`UPDATE offers SET status = 'rejected', updated_at = NOW() WHERE offer_id = $1 RETURNING *`, [offerId])).rows[0];
+
+            // Log History
+            await client.query(
+                `INSERT INTO offer_history (offer_id, changed_by_user_id, previous_price, new_price, status_change)
+                 VALUES ($1, $2, $3, $3, 'rejected')`,
+                [offerId, userId, offer.offer_price]
+            );
+
+            notificationMessage = `Your offer of ₹${offer.offer_price} was rejected.`;
+        } 
+        // =================================================
+        // OPTION 3: COUNTER-OFFER
+        // =================================================
+        else if (responseType === 'counter') {
+            if (!newPrice || isNaN(newPrice)) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'Valid price required for counter.' });
             }
 
             const newStatus = (offer.status === 'pending_seller') ? 'pending_buyer' : 'pending_seller';
             
-            const updateOfferQuery = `
-                UPDATE offers 
-                SET status = $1, offer_price = $2, updated_at = NOW() 
-                WHERE offer_id = $3 RETURNING *
-            `;
-            updatedOffer = (await client.query(updateOfferQuery, [newStatus, newPrice, offerId])).rows[0];
+            updatedOffer = (await client.query(
+                `UPDATE offers SET status = $1, offer_price = $2, updated_at = NOW() WHERE offer_id = $3 RETURNING *`, 
+                [newStatus, newPrice, offerId]
+            )).rows[0];
 
-            notificationRecipientId = (userId === offer.seller_id) ? offer.buyer_id : offer.seller_id;
-            const counterOfferName = (userId === offer.seller_id) ? offer.seller_name : offer.buyer_name;
-            notificationMessage = `${counterOfferName} sent you a counter-offer of ₹${newPrice} for "${listingName}".`;
+            // 🆕 Log History (Crucial for negotiation charts)
+            await client.query(
+                `INSERT INTO offer_history (offer_id, changed_by_user_id, previous_price, new_price, status_change)
+                 VALUES ($1, $2, $3, $4, 'countered')`,
+                [offerId, userId, offer.offer_price, newPrice]
+            );
 
-        } else {
-            return res.status(400).json({ message: 'Invalid response type.' });
+            notificationMessage = `Counter-offer received: ₹${newPrice}.`;
         }
 
-        // 4. Send notification and socket event
-        const linkUrl = `/offers`;
-        const newNotification = await createNotification(client, notificationRecipientId, notificationMessage, linkUrl);
+        // C. Send Notifications
+        const newNotification = await createNotification(client, recipientId, notificationMessage, `/offers`);
         
         if (req.io) {
-            req.io.to(notificationRecipientId.toString()).emit('offer_update', { offer: updatedOffer });
-            req.io.to(notificationRecipientId.toString()).emit('new_notification', newNotification);
+            req.io.to(recipientId.toString()).emit('offer_update', { offer: updatedOffer });
+            req.io.to(recipientId.toString()).emit('new_notification', newNotification);
         }
 
         await client.query('COMMIT');
-        res.status(200).json({ message: 'Response submitted successfully.', offer: updatedOffer });
+        res.status(200).json({ message: 'Response processed.', offer: updatedOffer });
 
     } catch (error) {
         await client.query('ROLLBACK');

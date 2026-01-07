@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import styled from 'styled-components';
-// ## NO CHANGE HERE ##
 import apiClient from '../../api/axiosConfig';
 import { useAuth } from '../../context/AuthContext';
 
-// --- Styled Components (One addition) ---
 const AdminWrapper = styled.div`
   display: flex;
   min-height: 100vh;
@@ -21,14 +19,24 @@ const Sidebar = styled.nav`
   flex-direction: column;
   flex-shrink: 0;
   transition: transform 0.3s ease-in-out;
+  box-sizing: border-box; /* Ensures padding doesn't affect width */
 
   @media (max-width: 768px) {
     position: fixed;
     left: 0;
     top: 0;
-    height: 100%;
+    
+    /* ✅ FIX 1: Use 100dvh to respect mobile browser bars */
+    height: 100dvh; 
+    
     z-index: 1000;
     transform: ${props => props.$isOpen ? 'translateX(0)' : 'translateX(-100%)'};
+    
+    /* ✅ FIX 2: Add padding for iPhone Home Indicator/Gesture Bar */
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+    
+    /* ✅ FIX 3: Allow scrolling if the menu is taller than the screen */
+    overflow-y: auto; 
   }
 `;
 
@@ -39,6 +47,7 @@ const SidebarTitle = styled.h1`
   color: #fff;
   text-align: center;
   margin-bottom: 3rem;
+  flex-shrink: 0; /* Prevents title from squashing */
 `;
 
 const StyledNavLink = styled(NavLink)`
@@ -49,6 +58,7 @@ const StyledNavLink = styled(NavLink)`
   border-radius: 8px;
   margin-bottom: 0.5rem;
   transition: background-color 0.2s, color 0.2s;
+  flex-shrink: 0; /* Prevents links from squashing */
 
   &:hover {
     background-color: #334155;
@@ -62,8 +72,6 @@ const StyledNavLink = styled(NavLink)`
   }
 `;
 
-// ## CHANGE: Added new LogoutButton styled component ##
-// This is styled to match the NavLinks but as a button.
 const LogoutButton = styled.button`
   background: none;
   border: none;
@@ -77,17 +85,17 @@ const LogoutButton = styled.button`
   cursor: pointer;
   text-align: left;
   width: 100%;
-  font-family: inherit; // Use the same font as the rest of the app
+  font-family: inherit;
+  flex-shrink: 0; /* Prevents button from disappearing */
 
   &:hover {
     background-color: #334155;
     color: #fff;
   }
 
-  // This pushes the button to the bottom of the flex column
-  margin-top: auto;
+  /* Pushes button to bottom, but sidebar scrolling handles overflow now */
+  margin-top: auto; 
 `;
-
 
 const MainContent = styled.main`
   flex-grow: 1;
@@ -162,19 +170,16 @@ const Backdrop = styled.div`
   }
 `;
 
-
 function AdminLayout() {
   const [users, setUsers] = useState([]);
   const [news, setNews] = useState([]);
-  const [isMobileNavOpen, setMobileNavOpen] = new useState(false);
-  // ## CHANGE: Destructured 'logout' from useAuth ##
+  const [isMobileNavOpen, setMobileNavOpen] = useState(false);
   const { user, logout } = useAuth();
   
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
     const fetchData = async () => {
       try {
-        // ## NO CHANGE HERE ##
         const [usersResponse, newsResponse] = await Promise.all([
           apiClient.get('/api/users'),
           apiClient.get('/api/news')
@@ -190,19 +195,13 @@ function AdminLayout() {
 
   return (
     <AdminWrapper>
-      <Sidebar $isOpen={isMobileNavOpen} onClick={() => setMobileNavOpen(false)}>
+      <Sidebar $isOpen={isMobileNavOpen}>
         <SidebarTitle>Diamond Connect</SidebarTitle>
-        <StyledNavLink to="/admin" end>Dashboard</StyledNavLink>
-        <StyledNavLink to="/admin/users">Manage Users</StyledNavLink>
+        <StyledNavLink to="/admin" end onClick={() => setMobileNavOpen(false)}>Dashboard</StyledNavLink>
+        <StyledNavLink to="/admin/users" onClick={() => setMobileNavOpen(false)}>Manage Users</StyledNavLink>
+        <StyledNavLink to="/admin/user-monitoring" onClick={() => setMobileNavOpen(false)}>User Monitoring</StyledNavLink>
+        <StyledNavLink to="/admin/news" onClick={() => setMobileNavOpen(false)}>Manage News</StyledNavLink>
         
-        {/* ## --- THIS IS THE NEW LINE --- ## */}
-        <StyledNavLink to="/admin/user-monitoring">User Monitoring</StyledNavLink>
-        
-        <StyledNavLink to="/admin/news">Manage News</StyledNavLink>
-        
-        {/* ## CHANGE: Added the LogoutButton component ## */}
-        {/* It's linked to the 'logout' function from AuthContext */}
-        {/* The 'margin-top: auto' in its style pushes it to the bottom */}
         <LogoutButton onClick={logout}>
           Log Out
         </LogoutButton>

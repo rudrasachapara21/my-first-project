@@ -34,7 +34,7 @@ const SelectField = styled.select`
   }
 `;
 
-const CtaButton = styled.button` width: 100%; padding: 1rem; border: none; border-radius: 12px; background: ${props => props.theme.accentPrimary}; color: #FFFFFF; font-family: 'Clash Display', sans-serif; font-size: 1.2rem; font-weight: 600; cursor: pointer; &:disabled { background-color: #ccc; } `;
+const CtaButton = styled.button` width: 100%; padding: 1rem; border: none; border-radius: 12px; background: ${props => props.theme.accentPrimary}; color: ${props => props.theme.textMain}; font-family: 'Clash Display', sans-serif; font-size: 1.2rem; font-weight: 600; cursor: pointer; &:disabled { background-color: #ccc; } `;
 const AiResult = styled.div` margin-top: 2rem; padding: 1.5rem; background-color: ${props => props.theme.bgSecondary}; border-radius: 16px; text-align: center; border: 1px dashed ${props => props.theme.accentSecondary}; `;
 const AiPrice = styled.p` font-family: 'Clash Display', sans-serif; font-size: 2.5rem; font-weight: 700; color: ${props => props.theme.accentPrimary}; margin: 0.5rem 0; `;
 const ErrorMessage = styled.p` color: #ef4444; text-align: center; font-weight: 500; `;

@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-// ## FIX 1: Corrected the import path to go up two levels ##
-import apiClient from '../../api/axiosConfig';
-import { useOutletContext } from 'react-router-dom';
+import apiClient from '../../api/axiosConfig'; // Ensure this path matches your folder structure
 
-// --- STYLED COMPONENTS (No changes needed) ---
+// --- STYLED COMPONENTS ---
 const Container = styled.div``;
 const Header = styled.div` display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; `;
 const Title = styled.h1` font-family: 'Clash Display', sans-serif; font-size: 2.5rem; color: #1e293b; `;
@@ -15,7 +13,7 @@ const Tr = styled.tr` @media (max-width: 768px) { display: block; border: 1px so
 const Th = styled.th` background-color: #f8fafc; padding: 1rem; text-align: left; font-size: 0.9rem; color: #64748b; border-bottom: 1px solid #e2e8f0; `;
 const Td = styled.td` padding: 1rem; border-bottom: 1px solid #e2e8f0; color: #334155; vertical-align: middle; @media (max-width: 768px) { display: block; text-align: right; border-bottom: 1px dotted #ccc; position: relative; padding-left: 50%; &:before { content: attr(data-label); position: absolute; left: 1rem; width: 45%; padding-right: 10px; white-space: nowrap; text-align: left; font-weight: bold; color: #334155; } &:last-child { border-bottom: none; } } `;
 const ImageThumbnail = styled.img` width: 80px; height: 50px; object-fit: cover; border-radius: 4px; `;
-const CardImage = styled.img` width: 100%; height: 150px; object-fit: cover; display: none; @media (max-width: 768px) { display: block; } `;
+const CardImage = styled.img` width: 100%; height: 150px; object-fit: cover; display: none; @media (max-width: 768px) { display: block; margin-bottom: 1rem; } `;
 const DeleteButton = styled.button` background-color: #ef4444; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; &:hover { background-color: #dc2626; } `;
 const EmptyState = styled.div` text-align: center; padding: 4rem; background-color: #fff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); `;
 const ModalBackdrop = styled.div` position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; `;
@@ -24,15 +22,27 @@ const Input = styled.input` width: 100%; padding: 0.8rem; margin-bottom: 1rem; b
 const TextArea = styled.textarea` width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem; min-height: 120px; resize: vertical; box-sizing: border-box; `;
 const ModalActions = styled.div` display: flex; justify-content: flex-end; gap: 1rem; `;
 
-
 function ManageNews() {
-  const { news, setNews } = useOutletContext();
+  // Reverted to local state to guarantee data loading
+  const [news, setNews] = useState([]);
   const [isModalOpen, setModalOpen] = useState(false);
   const [newArticle, setNewArticle] = useState({ title: '', content: '', image_url: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // ## FIX 2: Added the missing API_URL constant for building image paths ##
-  const API_URL = import.meta.env.VITE_API_URL;
+  const API_URL = import.meta.env.VITE_API_URL || '';
+
+  useEffect(() => {
+    fetchNews();
+  }, []);
+
+  const fetchNews = async () => {
+    try {
+        const res = await apiClient.get('/api/news');
+        setNews(res.data);
+    } catch (error) {
+        console.error("Failed to fetch news", error);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -87,13 +97,16 @@ function ManageNews() {
           <tbody>
             {news.map(article => (
               <Tr key={article.news_id}>
-                <CardImage src={getImageUrl(article.image_url)} alt={article.title} />
+                {/* --- FIX IS HERE: Moved CardImage INSIDE Td --- */}
                 <Td data-label="Image">
+                    <CardImage src={getImageUrl(article.image_url)} alt={article.title} />
                     <ImageThumbnail src={getImageUrl(article.image_url)} alt={article.title} />
                 </Td>
                 <Td data-label="Title">{article.title}</Td>
                 <Td data-label="Date">{new Date(article.created_at).toLocaleDateString()}</Td>
-                <Td data-label="Actions"><DeleteButton onClick={() => handleDeleteArticle(article.news_id)}>Delete</DeleteButton></Td>
+                <Td data-label="Actions">
+                    <DeleteButton onClick={() => handleDeleteArticle(article.news_id)}>Delete</DeleteButton>
+                </Td>
               </Tr>
             ))}
           </tbody>

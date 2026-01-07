@@ -6,8 +6,11 @@ import PageHeader from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { 
     PiChatCircleDots, PiUserPlus, PiXCircle, PiUserMinus, PiCheckCircle, PiCertificate,
-    PiMedal, PiStar, PiStarFill, PiStarHalfFill, PiUsers, PiChatText
+    PiMedal, PiStar, PiStarFill, PiStarHalfFill, PiUsers, PiChatText, PiFileText
 } from 'react-icons/pi';
+
+// ## --- IMPORT THE MODAL --- ##
+import ExportStatementModal from '../components/modals/ExportStatementModal';
 
 // --- Styles ---
 const Container = styled.div``;
@@ -162,6 +165,29 @@ const CompleteButton = styled(ActionButton)`
   border-color: #22c55e;
   color: white;
 `;
+
+// ## --- NEW EXPORT BUTTON STYLE --- ##
+const ExportSmallButton = styled.button`
+  background-color: transparent;
+  color: ${props => props.theme.textSecondary};
+  border: 1px solid ${props => props.theme.borderColor};
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  transition: all 0.2s;
+
+  &:hover {
+    background-color: ${props => props.theme.bgPrimary};
+    color: ${props => props.theme.textPrimary};
+  }
+`;
+
 const ReviewSection = styled(Section)`
   max-width: 100%;
   align-items: flex-start;
@@ -282,7 +308,7 @@ const ReviewTextArea = styled.textarea`
 // --- (End of Styles) ---
 
 
-// --- Helper Components (AnimatedCounter, StarRating) ---
+// --- Helper Components ---
 const AnimatedCounter = ({ value }) => {
   const [count, setCount] = useState(0);
   useEffect(() => {
@@ -313,18 +339,14 @@ const StarRating = ({ rating }) => {
   return <StarRatingDisplay>{stars}</StarRatingDisplay>;
 };
 
-
-// ## --- NEW HELPER FUNCTION --- ##
 const getAvatarUrl = (photoUrl, name) => {
   const API_ROOT_URL = import.meta.env.VITE_API_URL.replace('/api', '');
   if (!photoUrl) {
     return `https://ui-avatars.com/api/?name=${name ? name.replace(' ', '+') : 'User'}&background=random`;
   }
   if (photoUrl.startsWith('http')) {
-    // It's a Cloudinary URL, use it directly
     return photoUrl;
   }
-  // It's an old /uploads/ file, add the API root
   return `${API_ROOT_URL}${photoUrl}`;
 };
 
@@ -348,10 +370,11 @@ function BrokerProfilePage() {
     const [reviewText, setReviewText] = useState('');
     const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
+    // ## --- STATE FOR EXPORT MODAL --- ##
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
     const demand = state?.demand;
     
-    // (Removed API_URL from here)
-
     useEffect(() => {
         if (!user || !userId) return;
         
@@ -406,7 +429,7 @@ function BrokerProfilePage() {
                 review_text: reviewText
             });
             alert("Review submitted successfully!");
-            closeReviewModal(true); // Pass true to navigate
+            closeReviewModal(true); 
         } catch (error) {
             alert(error.response?.data?.message || "Failed to submit review.");
         } finally {
@@ -424,19 +447,20 @@ function BrokerProfilePage() {
         }
     }, [navigate]); 
 
-
     if (isLoading || !profile) {
         return <PageHeader title="Loading Profile..." />;
     }
 
     const isHired = demand && demand.hired_broker_id === profile.user_id;
 
+    // ## --- CHECK IF IT IS MY OWN PROFILE --- ##
+    const isOwnProfile = user && profile && parseInt(user.id) === parseInt(profile.user_id);
+
     return (
         <Container>
             <PageHeader title={`${profile.role === 'broker' ? 'Broker' : 'Trader'} Profile`} backTo={-1} />
             <ProfileWrapper>
                 <ProfileCard>
-                    {/* ## --- THIS IS THE FIX (Line 1) --- ## */}
                     <Avatar src={getAvatarUrl(profile.profile_photo_url, profile.full_name)} alt={profile.full_name} />
                     
                     <NameWrapper>
@@ -449,7 +473,16 @@ function BrokerProfilePage() {
                     </NameWrapper>
 
                     <Office>{profile.office_name}</Office>
+
+                    {/* ## --- SHOW EXPORT BUTTON IF OWN PROFILE --- */}
+                    {isOwnProfile && (
+                        <ExportSmallButton onClick={() => setIsExportModalOpen(true)}>
+                            <PiFileText /> Export Statement
+                        </ExportSmallButton>
+                    )}
                     
+                    <div style={{ margin: '1rem 0' }}></div>
+
                     <StatsGrid>
                         <StatCard>
                             <StatIcon color="#22c55e"><PiMedal /></StatIcon>
@@ -512,7 +545,6 @@ function BrokerProfilePage() {
                             <ReviewCard key={review.review_id}>
                                 <ReviewHeader>
                                     <ReviewerInfo>
-                                        {/* ## --- THIS IS THE FIX (Line 2) --- ## */}
                                         <Avatar 
                                             style={{width: '40px', height: '40px'}}
                                             src={getAvatarUrl(review.reviewer_photo, review.reviewer_name)} 
@@ -575,6 +607,12 @@ function BrokerProfilePage() {
                     </ModalContent>
                 </ModalBackdrop>
             )}
+
+            {/* ## --- EXPORT MODAL --- ## */}
+            <ExportStatementModal 
+                isOpen={isExportModalOpen} 
+                onClose={() => setIsExportModalOpen(false)} 
+            />
         </Container>
     );
 }

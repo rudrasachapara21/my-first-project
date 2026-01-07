@@ -25,7 +25,7 @@ async function verifyToken(req, res, next) {
 
         // ## --- UPDATED QUERY --- ##
         // Fetch the user and their suspension status
-        const query = 'SELECT user_id, full_name, email, role, is_suspended FROM users WHERE user_id = $1';
+        const query = 'SELECT user_id, full_name, email, role, is_suspended, is_verified, email_verified FROM users WHERE user_id = $1';
         const { rows } = await db.query(query, [decoded.user_id]);
 
         if (rows.length === 0) {
@@ -36,6 +36,14 @@ async function verifyToken(req, res, next) {
         // Check if the user is suspended
         if (rows[0].is_suspended) {
             return res.status(403).json({ message: 'Your account is suspended. Please contact support.' });
+        }
+
+        // Enforce email verification and admin approval for protected routes
+        if (!rows[0].email_verified) {
+            return res.status(403).json({ message: 'Please verify your email via OTP.' });
+        }
+        if (!rows[0].is_verified) {
+            return res.status(403).json({ message: 'Your account is awaiting admin approval.' });
         }
 
         // Attach user information to the request object for use in subsequent routes

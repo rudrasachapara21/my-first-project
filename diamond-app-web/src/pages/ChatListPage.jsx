@@ -11,7 +11,7 @@ const SearchInput = styled.input` width: 100%; padding: 0.8rem 1rem; border-radi
 const ResultsContainer = styled.div` max-height: 300px; overflow-y: auto; `;
 const ChatList = styled.div` padding: 0; `;
 const ChatItem = styled.div` display: flex; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid ${props => props.theme.borderColor}; cursor: pointer; &:hover { background-color: ${props => props.theme.bgSecondary}; } `;
-const Avatar = styled.div` width: 50px; height: 50px; border-radius: 50%; background-color: #A5B4FC; margin-right: 1rem; flex-shrink: 0; `;
+const Avatar = styled.div` width: 50px; height: 50px; border-radius: 50%; background-color: ${props => props.theme.accentPrimary}; margin-right: 1rem; flex-shrink: 0; `;
 const ChatContent = styled.div` flex-grow: 1; overflow: hidden; `;
 const ChatName = styled.h3` margin: 0 0 0.25rem 0; font-size: 1.1rem; font-weight: 600; color: ${props => props.theme.textPrimary}; `;
 const LastMessage = styled.p` margin: 0; font-size: 0.9rem; color: ${props => props.theme.textSecondary}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; `;

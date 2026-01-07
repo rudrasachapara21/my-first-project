@@ -28,7 +28,7 @@ const TabButton = styled.button`
   cursor: pointer;
   transition: all 0.3s ease;
   font-family: 'Clash Display', sans-serif;
-  color: ${props => props.$active ? '#FFFFFF' : props.theme.textSecondary};
+  color: ${props => props.$active ? props.theme.textMain : props.theme.textSecondary};
   background-color: ${props => props.$active ? props.theme.accentPrimary : 'transparent'};
 `;
 

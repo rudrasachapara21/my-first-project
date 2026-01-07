@@ -50,7 +50,7 @@ const TextArea = styled.textarea`
 `;
 const SubmitButton = styled.button`
     padding: 1rem; border: none; border-radius: 12px; background: ${props => props.theme.accentPrimary};
-    color: #FFFFFF; font-family: 'Clash Display', sans-serif;
+    color: ${props => props.theme.textMain}; font-family: 'Clash Display', sans-serif;
     font-size: 1.2rem; font-weight: 600; cursor: pointer; &:disabled { background: #ccc; }
 `;
 const ResponseMessage = styled.p`

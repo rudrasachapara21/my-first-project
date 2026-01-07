@@ -1,50 +1,70 @@
 import axios from 'axios';
 
-// Create a new Axios instance
-const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-});
+// ✅ AUTO-DETECT: Uses localhost when testing, and Render when built.
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://diamond-connect-backend.onrender.com';
 
-// This interceptor ADDS the auth token to every request
+const apiClient = axios.create({
+  baseURL: BASE_URL,
+});
+import { showLoader, hideLoader } from '../utils/loaderService';
+
 apiClient.interceptors.request.use(
   (config) => {
+    // Start global loader for all requests
+    try { showLoader(); } catch (e) {}
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// --- THE FIX: This new interceptor CHECKS every response ---
 apiClient.interceptors.response.use(
-  // If the response is successful (e.g., status 200), just return it
-  (response) => {
-    return response;
-  },
-  // If the response has an error...
-  (error) => {
-    // Check if the error is a 401 Unauthorized error
-    if (error.response && error.response.status === 401) {
-      // If it is, the token is invalid or expired.
-      console.log('Stale or invalid token detected. Logging out.');
+  (response) => response,
+  async (error) => {
+    // Hide loader for responses and errors
+    try { hideLoader(); } catch (e) {}
+    const originalRequest = error.config;
+    
+    // Handle JWT expiry with auto-refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
       
-      // 1. Clear the bad credentials from storage
+      try {
+        // Attempt to refresh the token
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (refreshToken) {
+          const response = await axios.post(`${BASE_URL}/api/auth/refresh`, {
+            refreshToken: refreshToken
+          });
+          
+          const { token } = response.data;
+          localStorage.setItem('token', token);
+          
+          // Retry the original request with new token
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return apiClient(originalRequest);
+        }
+      } catch (refreshError) {
+        console.log('Token refresh failed, logging out.');
+      }
+      
+      // If refresh fails or no refresh token, logout gracefully
+      console.log('JWT expired and refresh failed. Initiating graceful logout.');
       localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       
-      // 2. Redirect the user to the login page
-      // We use window.location.href for a hard redirect to clear all app state.
-      window.location.href = '/login';
+      // Only redirect if not already on login page
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
     }
     
-    // For any other error, just pass it along
     return Promise.reject(error);
   }
 );
-
 
 export default apiClient;

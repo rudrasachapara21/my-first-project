@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await apiClient.post('/api/auth/login', { email, password });
       
-      const { token, user: userData } = response.data;
+      const { token, refreshToken, user: userData } = response.data;
 
       if (token && userData) {
         if (role && userData.role !== role) {
@@ -47,6 +47,7 @@ export const AuthProvider = ({ children }) => {
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         
         localStorage.setItem('token', token);
+        localStorage.setItem('refreshToken', refreshToken);
         localStorage.setItem('user', JSON.stringify(userData));
         
         return { success: true, user: userData };
@@ -63,6 +64,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     delete apiClient.defaults.headers.common['Authorization'];
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
   };
 

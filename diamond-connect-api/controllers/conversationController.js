@@ -1,6 +1,10 @@
 const db = require('../db');
 const path = require('path');
 
+/**
+ * @desc    Create a new conversation or return an existing one
+ * @route   POST /api/conversations
+ */
 exports.createOrGetConversation = async (req, res, next) => {
   const { recipientId } = req.body;
   const senderId = req.user.user_id;
@@ -50,6 +54,10 @@ exports.createOrGetConversation = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Get all conversations for the logged-in user
+ * @route   GET /api/conversations
+ */
 exports.getUserConversations = async (req, res, next) => {
   const userId = req.user.user_id;
   try {
@@ -80,6 +88,61 @@ exports.getUserConversations = async (req, res, next) => {
   }
 };
 
+/**
+ * ✅ NEW FUNCTION: Get metadata for a specific conversation
+ * @desc    Get conversation details and participants
+ * @route   GET /api/conversations/:id
+ */
+exports.getConversationById = async (req, res, next) => {
+    const { id: conversationId } = req.params;
+    const userId = req.user.user_id;
+
+    try {
+        // Fetch conversation and join with participants' basic user info
+        const query = `
+            SELECT 
+                c.conversation_id,
+                c.created_at,
+                json_agg(
+                    json_build_object(
+                        'user_id', u.user_id,
+                        'full_name', u.full_name,
+                        'email', u.email,
+                        'profile_photo_url', u.profile_photo_url
+                    )
+                ) as participants
+            FROM conversations c
+            JOIN conversation_participants cp ON c.conversation_id = cp.conversation_id
+            JOIN users u ON cp.user_id = u.user_id
+            WHERE c.conversation_id = $1
+            GROUP BY c.conversation_id;
+        `;
+        
+        const { rows } = await db.query(query, [conversationId]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'Conversation not found.' });
+        }
+
+        const conversation = rows[0];
+
+        // Security check: ensure the requester is a participant
+        const isParticipant = conversation.participants.some(p => p.user_id === userId);
+        if (!isParticipant) {
+            return res.status(403).json({ message: 'Forbidden: You are not a participant.' });
+        }
+
+        res.status(200).json(conversation);
+    } catch (error) {
+        console.error("Error in getConversationById:", error);
+        next(error);
+    }
+};
+
+/**
+ * @desc    Get all messages for a specific conversation
+ * @route   GET /api/conversations/:id/messages
+ */
 exports.getConversationMessages = async (req, res, next) => {
   const { id: conversationId } = req.params;
   const userId = req.user.user_id;
@@ -100,6 +163,10 @@ exports.getConversationMessages = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Handle secure document uploads in a conversation via Cloudinary
+ * @route   POST /api/conversations/:id/documents
+ */
 exports.uploadDocumentInConversation = async (req, res, next) => {
     const { id: conversationId } = req.params;
     const uploaderId = req.user.user_id;
@@ -120,16 +187,12 @@ exports.uploadDocumentInConversation = async (req, res, next) => {
             throw new Error('Forbidden: You are not a participant in this conversation.');
         }
 
-        // ## --- THIS IS THE FIX --- ##
-        // Cloudinary provides the original name and the secure URL.
         const { originalname, path: attachmentUrl } = req.file;
-        // ## --- END OF FIX --- ##
 
         const docQuery = `
             INSERT INTO secure_documents (conversation_id, uploader_id, file_name, file_path)
             VALUES ($1, $2, $3, $4) RETURNING document_id;
         `;
-        // Save the permanent URL to the database
         await client.query(docQuery, [conversationId, uploaderId, originalname, attachmentUrl]);
 
         const messageContent = `📎 Document: ${originalname}`;
@@ -138,7 +201,6 @@ exports.uploadDocumentInConversation = async (req, res, next) => {
             INSERT INTO messages (conversation_id, sender_id, content, attachment_url)
             VALUES ($1, $2, $3, $4) RETURNING *;
         `;
-        // Save the permanent URL to the message as well
         const { rows: msgRows } = await client.query(msgQuery, [conversationId, uploaderId, messageContent, attachmentUrl]);
         const newMessage = msgRows[0];
         

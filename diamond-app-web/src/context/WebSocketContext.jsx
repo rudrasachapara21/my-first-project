@@ -13,29 +13,32 @@ export const WebSocketProvider = ({ children }) => {
 
     useEffect(() => {
         if (token) {
-            // This is a good change to ensure you connect to the base URL
+            // Logic to clean the URL
             const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace('/api', '');
             
+            // ✅ FIX: Force WebSocket transport & explicit Auth handshake
             socketRef.current = io(SOCKET_URL, {
-                auth: { token }
+                transports: ['websocket'], // Prevents 400 Bad Request
+                upgrade: false,
+                auth: { token } // Sends token for backend 'socket.handshake.auth.token'
             });
 
             socketRef.current.on('connect', () => {
-                console.log('WebSocket Connected via Context');
+                console.log('🚀 WebSocket Authenticated & Connected');
                 setIsConnected(true);
             });
 
             socketRef.current.on('disconnect', () => {
-                console.log('WebSocket Disconnected via Context');
+                console.log('WebSocket Disconnected');
                 setIsConnected(false);
             });
 
             socketRef.current.on('connect_error', (err) => {
-                console.error('WebSocket Connection Error via Context:', err.message);
+                console.error('❌ WebSocket Auth Error:', err.message);
             });
 
             return () => {
-                socketRef.current.disconnect();
+                if (socketRef.current) socketRef.current.disconnect();
             };
         } else if (socketRef.current) {
             socketRef.current.disconnect();

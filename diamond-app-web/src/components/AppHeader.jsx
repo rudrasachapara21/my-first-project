@@ -1,141 +1,174 @@
 import React, { useState } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes, css } from 'styled-components';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { PiList, PiUserCircle, PiBell } from "react-icons/pi";
 import NotificationCenter from './NotificationCenter';
 import { useNotifications } from '../context/NotificationContext';
-// ## --- CHANGE 1: Import useAuth --- ##
 import { useAuth } from '../context/AuthContext'; 
+
+// ✨ ANIMATION: Soft breathing pulse for the notification badge
+const badgePulse = keyframes`
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { transform: scale(1.15); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+`;
 
 const Header = styled.header`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  
-  /* --- THIS IS THE FIX --- */
-  
-  /* 1. We remove the simple 'padding' property */
-  
-  /* 2. We define padding for each side individually */
-  padding-left: 1.5rem;
-  padding-right: 1.5rem;
-  padding-bottom: 1.5rem;
-
-  /* 3. We use calc() to add the safe area to your existing top padding */
-  /* env(safe-area-inset-top) is the height of the status bar (on mobile) */
-  /* 1.5rem is the fallback for web browsers */
-  padding-top: calc(1.5rem + env(safe-area-inset-top, 0rem));
-  
-  @media (max-width: 480px) {
-    /* 4. We do the same for the mobile media query */
-    padding-left: 1rem;
-    padding-right: 1rem;
-    padding-bottom: 1rem;
-    padding-top: calc(1rem + env(safe-area-inset-top, 0rem));
-  }
+  padding: 1.5rem 2rem;
+  z-index: 1000;
+  background: ${props => props.theme.glassEffect ? 'transparent' : props.theme.bgPrimary};
+  transition: all 0.4s ease;
 `;
 
 const HeaderTitle = styled.h1`
   font-family: 'Clash Display', sans-serif;
-  font-size: 2rem;
-  font-weight: 600;
+  font-size: 1.8rem;
+  font-weight: 700;
   color: ${props => props.theme.textPrimary};
-  margin: 0;
-
-  @media (max-width: 480px) {
-    font-size: 1.5rem;
-  }
+  letter-spacing: -0.5px;
 `;
 
 const HeaderActions = styled.div`
-  position: relative; 
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.5rem;
+  position: relative;
 `;
 
-const BellWrapper = styled.div`
-  position: relative; 
+const IconButtonWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  color: ${props => props.theme.textSecondary};
+  background: ${props => props.theme.textPrimary}08;
+  border: 1px solid ${props => props.theme.textPrimary}0D;
+  
+  &:hover {
+    background: ${props => props.theme.accentPrimary}15;
+    color: ${props => props.theme.accentPrimary};
+    transform: translateY(-3px) scale(1.05);
+    border-color: ${props => props.theme.accentPrimary}40;
+  }
+`;
+
+const BellWrapper = styled(IconButtonWrapper)`
+  position: relative; 
 `;
 
 const NotificationBadge = styled.div`
   position: absolute;
   top: -4px;
   right: -4px;
-  background-color: #EF4444;
-  color: white;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
+  /* 🎨 Use theme error color for badge */
+  background: linear-gradient(135deg, ${props => props.theme.error} 0%, ${props => props.theme.error}CC 100%);
+  color: ${props => props.theme.textPrimary};
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 10px;
   font-size: 0.7rem;
-  font-weight: bold;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 2px solid ${props => props.theme.bgPrimary};
+  box-shadow: 0 0 15px ${props => props.theme.error}44;
+  animation: ${css`${badgePulse} 2.5s infinite ease-in-out`};
+  pointer-events: none;
 `;
 
-// ## --- CHANGE 2: Add the Avatar component --- ##
+const AvatarWrapper = styled.div`
+  position: relative;
+  padding: 3px;
+  border-radius: 50%;
+  /* 💎 Glowing 3D Ring */
+  background: linear-gradient(45deg, ${props => props.theme.accentPrimary}, ${props => props.theme.textPrimary}33);
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+
+  &:hover { 
+    transform: scale(1.1) rotate(5deg);
+  background: linear-gradient(45deg, ${props => props.theme.accentPrimary}, ${props => props.theme.textPrimary});
+    box-shadow: 0 0 20px ${props => props.theme.accentPrimary}66;
+  }
+`;
+
 const Avatar = styled.img`
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   object-fit: cover;
-  cursor: pointer;
-  border: 2px solid ${props => props.theme.accentPrimary};
+  border: 2px solid ${props => props.theme.bgPrimary};
+  display: block;
 `;
 
-// ## --- CHANGE 3: Add the avatar helper function --- ##
 const getAvatarUrl = (photoUrl, name) => {
   if (!photoUrl) {
-    return `https://ui-avatars.com/api/?name=${name ? name.replace(' ', '+') : 'User'}&background=random`;
+    // 🎨 Improved fallback with brand-consistent colors
+    return `https://ui-avatars.com/api/?name=${name ? name.replace(' ', '+') : 'User'}&background=6366f1&color=fff&bold=true&font-size=0.45`;
   }
-  if (photoUrl.startsWith('http')) {
-    // It's a Cloudinary URL, use it directly
-    return photoUrl;
-  }
-  // It's an old /uploads/ file, but this case should no longer happen
-  // We'll add the API root just in case
-  const API_ROOT_URL = import.meta.env.VITE_API_URL.replace('/api', '');
-  return `${API_ROOT_URL}${photoUrl}`;
+  if (photoUrl.startsWith('http')) return photoUrl;
+  const API_ROOT = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace('/api', '');
+  return `${API_ROOT}${photoUrl.startsWith('/') ? '' : '/'}${photoUrl}`;
 };
-
 
 function AppHeader({ title }) {
     const navigate = useNavigate();
     const { unreadCount } = useNotifications();
     const { toggleSidebar } = useOutletContext() || {};
-    
-    // ## --- CHANGE 4: Get the user from AuthContext --- ##
     const { user } = useAuth();
-
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    
-    const closeDropdown = () => setIsDropdownOpen(false);
-    
-    // ## --- CHANGE 5: Build the avatar URL --- ##
+
     const avatarUrl = getAvatarUrl(user?.profile_photo_url, user?.full_name);
 
     return (
         <Header>
-            <PiList size={32} color="#64748B" onClick={toggleSidebar} style={{ cursor: 'pointer' }} />
+            <IconButtonWrapper onClick={toggleSidebar}>
+              <PiList size={26} />
+            </IconButtonWrapper>
+            
             <HeaderTitle>{title}</HeaderTitle>
+            
             <HeaderActions>
-                <BellWrapper onClick={() => setIsDropdownOpen(prev => !prev)}>
-                    <PiBell size={32} color="#64748B" />
-                    {unreadCount > 0 && <NotificationBadge>{unreadCount}</NotificationBadge>}
+                <BellWrapper onClick={(e) => {
+                    e.stopPropagation(); 
+                    setIsDropdownOpen(!isDropdownOpen);
+                }}>
+                    <PiBell size={26} />
+                    {unreadCount > 0 && (
+                      <NotificationBadge>{unreadCount > 99 ? '99+' : unreadCount}</NotificationBadge>
+                    )}
                 </BellWrapper>
                 
-                {/* ## --- CHANGE 6: Replace the icon with the Avatar --- ## */}
                 {user ? (
-                  <Avatar src={avatarUrl} alt={user.full_name} onClick={() => navigate('/edit-profile')} />
+                  <AvatarWrapper onClick={() => navigate('/edit-profile')}>
+                    <Avatar 
+                        src={avatarUrl} 
+                        alt="User" 
+                        onError={(e) => { e.target.src = getAvatarUrl(null, user.full_name); }} 
+                    />
+                  </AvatarWrapper>
                 ) : (
-                  <PiUserCircle size={36} color="#A5B4FC" onClick={() => navigate('/edit-profile')} style={{ cursor: 'pointer' }} />
+                  <IconButtonWrapper onClick={() => navigate('/edit-profile')}>
+                    <PiUserCircle size={30} />
+                  </IconButtonWrapper>
                 )}
 
-                {isDropdownOpen && <NotificationCenter onClose={closeDropdown} />}
+                {isDropdownOpen && (
+                    <NotificationCenter onClose={() => setIsDropdownOpen(false)} />
+                )}
             </HeaderActions>
         </Header>
     );
 }
+
 export default AppHeader;

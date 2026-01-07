@@ -2,11 +2,16 @@ const db = require('../db');
 
 exports.getSummary = async (req, res, next) => {
     const { user_id, role } = req.user;
+    
     try {
         let stats = {};
+        
         if (role === 'broker') {
+            // Broker Stats
             const demandsTodayQuery = `SELECT COUNT(*) FROM demands WHERE created_at >= NOW() - interval '24 hours'`;
             const handsRaisedQuery = `SELECT COUNT(*) FROM demand_interests WHERE broker_id = $1`;
+            
+            // Note: We use user_id here as verified by your schema
             const pointsQuery = `SELECT reputation_points FROM users WHERE user_id = $1`;
             
             const [demandsTodayRes, handsRaisedRes, pointsRes] = await Promise.all([
@@ -14,23 +19,35 @@ exports.getSummary = async (req, res, next) => {
                 db.query(handsRaisedQuery, [user_id]),
                 db.query(pointsQuery, [user_id])
             ]);
+            
             stats = {
                 stat1: { value: parseInt(demandsTodayRes.rows[0].count, 10), label: 'New Demands Today' },
                 stat2: { value: parseInt(handsRaisedRes.rows[0].count, 10), label: 'Hands Raised' },
-                stat3: { value: pointsRes.rows.length > 0 ? pointsRes.rows[0].reputation_points : 0, label: 'Reputation Points' }
+                stat3: { value: pointsRes.rows.length > 0 ? (pointsRes.rows[0].reputation_points || 0) : 0, label: 'Reputation Points' }
             };
-        } else if (role === 'trader') {
-            const activeDemandsQuery = `SELECT COUNT(*) FROM demands WHERE trader_id = $1 AND status = 'active'`;
-            const newInterestsQuery = `SELECT COUNT(di.interest_id) FROM demand_interests di JOIN demands d ON di.demand_id = d.demand_id WHERE d.trader_id = $1`;
+            
+        } else {
+            // Trader / Seller Stats
+            const activeDemandsQuery = `SELECT COUNT(*) FROM demands WHERE user_id = $1 AND status = 'active'`;
+            
+            const newInterestsQuery = `
+                SELECT COUNT(di.interest_id) 
+                FROM demand_interests di 
+                JOIN demands d ON di.demand_id = d.demand_id 
+                WHERE d.user_id = $1
+            `;
+            
             const [activeDemandsRes, newInterestsRes] = await Promise.all([
                 db.query(activeDemandsQuery, [user_id]),
                 db.query(newInterestsQuery, [user_id])
             ]);
+            
             stats = {
                 stat1: { value: parseInt(activeDemandsRes.rows[0].count, 10), label: 'Active Demands' },
                 stat2: { value: parseInt(newInterestsRes.rows[0].count, 10), label: 'New Interests' }
             };
         }
+        
         res.status(200).json(stats);
     } catch (error) {
         next(error);
@@ -40,7 +57,7 @@ exports.getSummary = async (req, res, next) => {
 exports.getAdminSummary = async (req, res, next) => {
     try {
         const totalUsersQuery = `SELECT COUNT(*) FROM users WHERE role != 'admin'`;
-        const activeListingsQuery = `SELECT COUNT(*) FROM listings WHERE status = 'available'`;
+        const activeListingsQuery = `SELECT COUNT(*) FROM listings WHERE status = 'active'`;
         const activeDemandsQuery = `SELECT COUNT(*) FROM demands WHERE status = 'active'`;
         const newsArticlesQuery = `SELECT COUNT(*) FROM news`;
 
@@ -63,10 +80,9 @@ exports.getAdminSummary = async (req, res, next) => {
     }
 };
 
-// ## --- UPDATED THIS FUNCTION --- ##
 exports.getUserGrowthChartData = async (req, res, next) => {
     try {
-        // Query by MONTH for the last 12 MONTHS
+        // FIX: Changed 'COUNT(id)' back to 'COUNT(user_id)'
         const query = `
             SELECT 
                 DATE_TRUNC('month', created_at)::DATE AS date, 
@@ -83,10 +99,8 @@ exports.getUserGrowthChartData = async (req, res, next) => {
     }
 };
 
-// ## --- UPDATED THIS FUNCTION --- ##
 exports.getMarketActivity = async (req, res, next) => {
     try {
-        // Query by MONTH for the last 12 MONTHS
         const query = `
             WITH all_months AS (
                 SELECT generate_series(
@@ -123,9 +137,9 @@ exports.getMarketActivity = async (req, res, next) => {
     }
 };
 
-// This function is unchanged
 exports.getUserVerificationStats = async (req, res, next) => {
     try {
+        // FIX: Changed 'COUNT(id)' back to 'COUNT(user_id)'
         const query = `
             SELECT 
                 is_verified, 

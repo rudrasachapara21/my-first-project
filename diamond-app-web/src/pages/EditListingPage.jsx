@@ -78,7 +78,7 @@ function EditListingPage() {
 
   return (
     <Container>
-      <PageHeader title="Edit Listing" backTo={`/listing/${listingId}`} />
+      <PageHeader title="Edit Listing" backTo={-1} />
       <FormContainer onSubmit={handleSubmit}>
         <InputGroup>
             <InputLabel>Size (Carat)</InputLabel>

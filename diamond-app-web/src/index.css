@@ -1,18 +1,60 @@
-@import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@500;600&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
 
-/* Basic reset */
-body,
-html,
-#root {
+:root {
+  --transition-speed: 0.3s;
+}
+
+body {
   margin: 0;
   padding: 0;
-  width: 100%;
-  min-height: 100vh;
-  box-sizing: border-box;
-
-  /* FIX: Set the default font for the entire application */
   font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* Smooth background transition when switching themes */
+  transition: background-color var(--transition-speed) ease;
+  overflow-x: hidden;
+}
 
-  /* Optional: Add a default background color from your theme if you have one */
-  /* background-color: #f8fafc; */
+/* 🧼 CLEAN CARD DESIGN (Not too premium, just right) */
+.standard-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px; /* Modern, not overly rounded */
+  padding: 1.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.standard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+}
+
+/* 🧊 MATTE TEXTURE */
+.matte-surface {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* 🟢 ACCENT BUTTONS */
+button.primary {
+  background-color: var(--accent-primary);
+  color: white;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+button.primary:hover {
+  opacity: 0.9;
+}
+
+/* Scrollbar - Minimalist */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 100, 100, 0.2);
+  border-radius: 10px;
 }

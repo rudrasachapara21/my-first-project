@@ -2,16 +2,15 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import apiClient from '../../api/axiosConfig';
 import { useOutletContext } from 'react-router-dom';
-// ## --- UPDATED ICONS --- ##
 import { PiUsersThree, PiDiamondsFour, PiPaperPlaneTilt, PiNewspaper, PiCheckCircle, PiHourglass } from "react-icons/pi";
+import GlassCard from '../../components/GlassCard';
 import UserGrowthChart from './UserGrowthChart';
 import MarketActivityChart from './MarketActivityChart';
-// ## --- REMOVED UserStatusChart --- ##
 
 const Title = styled.h1`
   font-family: 'Clash Display', sans-serif;
   font-size: 2.5rem;
-  color: #1e293b;
+  color: ${props => props.theme.textPrimary};
   margin-bottom: 2rem;
 `;
 const StatGrid = styled.div`
@@ -19,42 +18,40 @@ const StatGrid = styled.div`
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1.5rem;
 `;
-const StatCard = styled.div`
-  background-color: white;
+const StatCard = styled(GlassCard)`
   padding: 1.5rem;
   border-radius: 12px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
   display: flex;
   align-items: center;
 `;
+
+// --- FIX 1: Updated props to use $ prefix (Transient Props) ---
 const StatIcon = styled.div`
   font-size: 2.5rem;
-  /* Use the color prop if provided, otherwise default */
-  color: ${props => props.color || '#4f46e5'};
+  color: ${props => props.$color || props.theme.accentPrimary};
   margin-right: 1.5rem;
   padding: 0.8rem;
-  /* Use the color prop for background too */
-  background-color: ${props => props.bgColor || '#eef2ff'};
+  background-color: ${props => props.$bgColor || props.theme.bgSecondary};
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
 `;
+
 const StatInfo = styled.div``;
 const StatValue = styled.p`
   font-size: 2.2rem;
   font-weight: 600;
-  color: #1e293b;
+  color: ${props => props.theme.textPrimary};
   margin: 0;
   line-height: 1;
 `;
 const StatLabel = styled.p`
-  color: #64748b;
+  color: ${props => props.theme.textSecondary};
   margin: 0.25rem 0 0 0;
   font-size: 0.9rem;
 `;
 
-// This grid holds the Line Chart and the new Stat Cards
 const MainChartGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr;
@@ -62,11 +59,10 @@ const MainChartGrid = styled.div`
   margin-top: 3rem;
 
   @media (min-width: 1024px) {
-    grid-template-columns: 2fr 1fr; /* Line chart is 2/3, Cards are 1/3 */
+    grid-template-columns: 2fr 1fr; 
   }
 `;
 
-// ## --- NEW: A simple container for the two new cards --- ##
 const StatusCardContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -83,19 +79,17 @@ const ActivityGrid = styled.div`
     grid-template-columns: 1fr;
   }
 `;
-const ActivityCard = styled.div`
-  background-color: white;
+const ActivityCard = styled(GlassCard)`
   border-radius: 12px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
   overflow: hidden;
 `;
 const ActivityHeader = styled.h2`
   font-family: 'Clash Display', sans-serif;
   font-size: 1.2rem;
-  color: #1e293b;
+  color: ${props => props.theme.textPrimary};
   padding: 1rem 1.5rem;
   margin: 0;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid ${props => props.theme.borderColor};
 `;
 const ActivityList = styled.ul`
   list-style: none;
@@ -113,18 +107,17 @@ const ActivityItem = styled.li`
   }
 `;
 const ItemText = styled.span`
-  color: #334155;
+  color: ${props => props.theme.textPrimary};
   font-weight: 500;
 `;
 const ItemMeta = styled.span`
-  color: #94a3b8;
+  color: ${props => props.theme.textSecondary};
   font-size: 0.9rem;
 `;
 
 
 function AdminDashboard() {
   const [stats, setStats] = useState(null);
-  // ## --- NEW STATE for verification stats --- ##
   const [userStatus, setUserStatus] = useState({ verified: 0, pending: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const { users = [], news = [] } = useOutletContext() || {};
@@ -132,7 +125,6 @@ function AdminDashboard() {
   useEffect(() => {
     const fetchAllStats = async () => {
       try {
-        // Fetch all 3 endpoints in parallel
         const summaryPromise = apiClient.get('/api/stats/admin-summary');
         const verificationPromise = apiClient.get('/api/stats/user-verification');
         
@@ -191,14 +183,12 @@ function AdminDashboard() {
         </StatCard>
       </StatGrid>
       
-      {/* Grid 1: User Growth (Line) and NEW User Status (Cards) */}
       <MainChartGrid>
         <UserGrowthChart />
         
-        {/* ## --- THIS REPLACES THE DONUT CHART --- ## */}
         <StatusCardContainer>
           <StatCard>
-            <StatIcon color="#f59e0b" bgColor="#fffbeb">
+            <StatIcon>
               <PiHourglass />
             </StatIcon>
             <StatInfo>
@@ -207,7 +197,7 @@ function AdminDashboard() {
             </StatInfo>
           </StatCard>
           <StatCard>
-            <StatIcon color="#16a34a" bgColor="#f0fdf4">
+            <StatIcon>
               <PiCheckCircle />
             </StatIcon>
             <StatInfo>
@@ -216,11 +206,9 @@ function AdminDashboard() {
             </StatInfo>
           </StatCard>
         </StatusCardContainer>
-        {/* ## --- END OF REPLACEMENT --- ## */}
 
       </MainChartGrid>
 
-      {/* Grid 2: Market Activity (Bar) */}
       <div style={{ marginTop: '1.5rem' }}>
         <MarketActivityChart />
       </div>

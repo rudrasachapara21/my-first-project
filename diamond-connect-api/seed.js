@@ -2,8 +2,9 @@ const bcrypt = require('bcryptjs');
 const { query } = require('./db.js');
 
 async function createAdminUser() {
-  const email = 'rudrasachapara05@gmail.com';
-  const plainPassword = 'rudra123';
+  // Use environment variables for seeded admin credentials in dev.
+  const email = process.env.ADMIN_EMAIL || 'rudrasachapara05@gmail.com';
+  const plainPassword = process.env.ADMIN_PASSWORD || 'rudra123';
 
   console.log(`Checking for existing admin user with email: ${email}`);
   

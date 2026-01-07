@@ -40,24 +40,24 @@ function Settings() {
       <PageHeader title="Settings" />
       <SettingsList>
         <SettingsItem onClick={() => navigate('/edit-profile')}>
-          <PiUserCircle size={28} color="#64748B" />
+          <PiUserCircle size={28} color={'var(--text-secondary)'} />
           <SettingsText>Edit Profile</SettingsText>
         </SettingsItem>
         <SettingsItem onClick={() => navigate('/app-theme')}>
-          <PiPalette size={28} color="#64748B" />
+          <PiPalette size={28} color={'var(--text-secondary)'} />
           <SettingsText>App Theme</SettingsText>
         </SettingsItem>
         <SettingsItem onClick={() => navigate('/notifications')}>
-          <PiBell size={28} color="#64748B" />
+          <PiBell size={28} color={'var(--text-secondary)'} />
           <SettingsText>Notifications</SettingsText>
         </SettingsItem>
         <SettingsItem onClick={() => navigate('/security')}>
-          <PiShieldCheck size={28} color="#64748B" />
+          <PiShieldCheck size={28} color={'var(--text-secondary)'} />
           <SettingsText>Security</SettingsText>
         </SettingsItem>
         {/* ## NEW ITEM: Link to the Help page ## */}
         <SettingsItem onClick={() => navigate('/help')}>
-          <PiQuestion size={28} color="#64748B" />
+          <PiQuestion size={28} color={'var(--text-secondary)'} />
           <SettingsText>Help & Support</SettingsText>
         </SettingsItem>
       </SettingsList>

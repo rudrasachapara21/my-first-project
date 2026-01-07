@@ -1,86 +1,145 @@
 import React, { useState } from 'react';
-import styled, { ThemeProvider as StyledThemeProvider } from 'styled-components';
+import styled, { ThemeProvider as StyledThemeProvider, keyframes } from 'styled-components';
 import Lottie from "lottie-react";
-
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { diamondAnimation } from '../assets/animationData.js';
 
-// --- STYLED COMPONENTS (No changes here) ---
+// --- ANIMATIONS ---
+const fadeIn = keyframes`
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
+
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
+
+const pulseText = keyframes`
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
+`;
+
+// --- STYLED COMPONENTS ---
 const LoadingOverlay = styled.div`
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background-color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(8px);
     display: flex; justify-content: center; align-items: center; z-index: 9999;
 `;
+
 const Container = styled.div`
     display: flex; justify-content: center; align-items: center;
-    min-height: 100vh; background-color: ${props => props.theme.bgPrimary};
+    min-height: 100vh; background: ${props => props.theme.bgPrimary};
     font-family: 'Inter', sans-serif; padding: 1rem;
 `;
-const AuthCard = styled.div`width: 100%; max-width: 400px; text-align: center;`;
+
+const AuthCard = styled.div`
+    width: 100%; max-width: 450px; text-align: center;
+    animation: ${fadeIn} 0.7s ease-out;
+`;
+
 const Logo = styled.h1`
-    font-family: 'Clash Display', sans-serif; font-size: 2.8rem; font-weight: 700;
+    font-family: 'Clash Display', sans-serif; font-size: 3.2rem; font-weight: 700;
     color: ${props => props.theme.textPrimary}; margin-bottom: 0.5rem;
+    letter-spacing: -1.5px;
 `;
+
 const Tagline = styled.p`
-    color: ${props => props.theme.textSecondary}; margin-bottom: 2rem; font-size: 1.1rem;
+    color: ${props => props.theme.textSecondary}; margin-bottom: 2.5rem; 
+    font-size: 1.15rem; font-weight: 400; letter-spacing: 0.5px;
 `;
+
 const FormCard = styled.div`
-    background-color: ${props => props.theme.bgSecondary}; border-radius: 24px;
-    padding: 2.5rem; box-shadow: 0 10px 40px rgba(0,0,0,0.07); text-align: left;
+    background-color: ${props => props.theme.bgSecondary}; border-radius: 32px;
+    padding: 3.5rem 3rem; box-shadow: 0 25px 60px rgba(0,0,0,0.12); text-align: left;
+    border: 1px solid ${props => props.theme.borderColor};
 `;
+
 const RoleToggle = styled.div`
     display: flex; background-color: ${props => props.theme.bgPrimary};
-    border-radius: 12px; padding: 5px; margin-bottom: 2rem;
+    border-radius: 16px; padding: 6px; margin-bottom: 2.5rem;
+    border: 1px solid ${props => props.theme.borderColor};
+    /* UNIFIED SHADOW: matching input fields */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); 
 `;
+
 const ToggleButton = styled.button`
-    flex: 1; padding: 0.75rem; border: none; font-size: 1rem; font-weight: 500;
-    border-radius: 8px; cursor: pointer; transition: all 0.3s ease;
+    flex: 1; padding: 0.9rem; border: none; font-size: 0.95rem; font-weight: 600;
+    border-radius: 12px; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     font-family: 'Clash Display', sans-serif;
-    color: ${props => props.$active ? '#FFFFFF' : props.theme.textSecondary};
+    color: ${props => props.$active ? props.theme.textMain : props.theme.textSecondary};
     background-color: ${props => props.$active ? props.theme.accentPrimary : 'transparent'};
+    &:hover { color: ${props => !props.$active && props.theme.textPrimary}; }
 `;
+
 const InputField = styled.input`
-    width: 100%; padding: 1rem; background-color: ${props => props.theme.bgPrimary};
-    border: 2px solid ${props => props.theme.borderColor}; border-radius: 12px;
+    width: 100%; padding: 1.2rem; background-color: ${props => props.theme.bgPrimary};
+    border: 2px solid ${props => props.theme.borderColor}; border-radius: 16px;
     color: ${props => props.theme.textPrimary}; font-size: 1rem;
     box-sizing: border-box; margin-bottom: 1.5rem;
-    &:focus { outline: none; border-color: ${props => props.theme.accentPrimary}; }
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    &:focus { outline: none; border-color: ${props => props.theme.accentPrimary}; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); }
 `;
+
+const Spinner = styled.div`
+    width: 20px; height: 20px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top: 3px solid ${props => props.theme.textMain};
+    border-radius: 50%;
+    animation: ${spin} 0.8s linear infinite;
+    display: inline-block;
+    margin-right: 10px;
+    vertical-align: middle;
+`;
+
+const LoadingText = styled.span`
+    animation: ${pulseText} 1.5s ease-in-out infinite;
+    vertical-align: middle;
+`;
+
 const CtaButton = styled.button`
-    width: 100%; padding: 1rem; border: none; border-radius: 12px;
-    background: ${props => props.theme.textPrimary}; color: ${props => props.theme.bgSecondary};
-    font-family: 'Clash Display', sans-serif; font-size: 1.2rem; font-weight: 600; cursor: pointer;
-    &:disabled { background-color: #ccc; cursor: not-allowed; }
+    width: 100%; padding: 1.2rem; border: none; border-radius: 16px;
+    background: ${props => props.theme.accentPrimary}; color: ${props => props.theme.textMain};
+    font-family: 'Clash Display', sans-serif; font-size: 1.15rem; font-weight: 600; cursor: pointer;
+    transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    display: flex; justify-content: center; align-items: center;
+    &:hover { background: #4338ca; transform: translateY(-2px); box-shadow: 0 10px 20px rgba(79, 70, 229, 0.2); }
+    &:active { transform: translateY(0); }
+    &:disabled { background-color: #94a3b8; cursor: not-allowed; transform: none; }
 `;
+
 const ErrorMessage = styled.p`
-    color: #e53e3e; font-size: 0.9rem; text-align: center; margin-top: 1rem;
+    color: #ef4444; font-size: 0.85rem; text-align: center; margin-top: 1.2rem;
+    font-weight: 500; background: rgba(239, 68, 68, 0.1); padding: 0.75rem; border-radius: 10px;
 `;
+
 const AdminLinkContainer = styled.div`
-    margin-top: 1.5rem;
-    text-align: center;
-    font-size: 0.9rem;
+    margin-top: 2rem; text-align: center;
 `;
 
 const RegisterLinkContainer = styled.div`
-    margin-top: 1rem;
-    text-align: center;
-    font-size: 0.9rem;
+    margin-top: 1.2rem; text-align: center; font-size: 0.95rem;
     color: ${props => props.theme.textSecondary};
 `;
+
 const StyledLink = styled.button`
-    background: none;
-    border: none;
-    color: ${props => props.theme.textPrimary}; 
-    text-decoration: underline;
-    cursor: pointer;
-    padding: 0;
-    font-size: 0.9rem;
-    margin-left: 5px;
+    background: none; border: none; color: ${props => props.theme.accentPrimary}; 
+    font-weight: 600; cursor: pointer; padding: 0; font-size: 0.95rem; margin-left: 8px;
+    &:hover { text-decoration: underline; }
 `;
 
+const GhostButton = styled.button`
+    background: transparent; border: none; color: ${props => props.theme.textSecondary};
+    font-size: 0.9rem; font-weight: 500; cursor: pointer;
+    padding: 0.5rem 1rem; border-radius: 10px; transition: all 0.2s;
+    &:hover { color: ${props => props.theme.textPrimary}; background: ${props => props.theme.bgPrimary}; }
+`;
 
 function Login() {
     const [activeRole, setActiveRole] = useState('trader');
@@ -110,24 +169,23 @@ function Login() {
         <StyledThemeProvider theme={currentTheme}>
             {isLoading && (
                 <LoadingOverlay>
-                    <Lottie animationData={diamondAnimation} loop={true} style={{ width: 150, height: 150 }}/>
-                    
-                    {/* ## FIX: Corrected the closing tag from </OpeningOverlay> to </LoadingOverlay> ## */}
+                    <Lottie animationData={diamondAnimation} loop={true} style={{ width: 120, height: 120 }}/>
                 </LoadingOverlay>
             )}
             <Container>
                 <AuthCard>
                     <Logo>Connect</Logo>
-                    <Tagline>The Premier B2B Diamond Exchange</Tagline>
+                    <Tagline>Premier B2B Diamond Exchange</Tagline>
                     <FormCard>
                         <RoleToggle>
                             <ToggleButton $active={activeRole === 'trader'} onClick={() => setActiveRole('trader')}>Trader</ToggleButton>
                             <ToggleButton $active={activeRole === 'broker'} onClick={() => setActiveRole('broker')}>Broker</ToggleButton>
                         </RoleToggle>
+                        
                         <form onSubmit={handleLogin}>
                             <InputField 
                                 type="email" 
-                                placeholder="Email" 
+                                placeholder="Email Address" 
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
@@ -140,32 +198,27 @@ function Login() {
                                 required
                             />
                             
-                            {/* ## FIX: Corrected the closing tag from </CToButton> to </CtaButton> ## */}
                             <CtaButton type="submit" disabled={isLoading}>
-                                {isLoading ? 'Logging In...' : 'Login'}
+                                {isLoading ? (
+                                    <>
+                                        <Spinner />
+                                        <LoadingText>Logging In...</LoadingText>
+                                    </>
+                                ) : 'Login'}
                             </CtaButton>
                             
                             {error && <ErrorMessage>{error}</ErrorMessage>}
                         </form>
                         
                         <AdminLinkContainer>
-                            <button 
-                                type="button" 
-                                onClick={() => navigate('/admin/login')} 
-                                style={{ background: 'none', border: 'none', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: '0.9rem' }}
-                                >
+                            <GhostButton type="button" onClick={() => navigate('/admin/login')}>
                                 Admin Portal
-                            </button>
+                            </GhostButton>
                         </AdminLinkContainer>
 
                         <RegisterLinkContainer>
                             Don't have an account?
-                            <StyledLink 
-                                type="button" 
-                                onClick={() => navigate('/register')} 
-                                >
-                                Register
-                            </StyledLink>
+                            <StyledLink type="button" onClick={() => navigate('/register')}>Register</StyledLink>
                         </RegisterLinkContainer>
 
                     </FormCard>
@@ -174,4 +227,5 @@ function Login() {
         </StyledThemeProvider>
     );
 }
+
 export default Login;

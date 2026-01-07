@@ -419,7 +419,7 @@ function AdminUserDetailPage() {
 
   return (
     <Container>
-      <PageHeader title="User Profile & Activity" backTo="/admin/user-monitoring" />
+      <PageHeader title="User Profile & Activity" backTo={-1} />
       
       <ProfileHeader>
         <ProfileTop>

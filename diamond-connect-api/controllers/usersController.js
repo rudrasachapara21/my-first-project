@@ -15,7 +15,6 @@ exports.createUser = async (req, res, next) => {
     try {
         const passwordHash = await bcrypt.hash(password, 12);
         
-        // ## FIX: Set is_verified = true by default when admin creates user ##
         const query = `
             INSERT INTO users (full_name, email, password_hash, role, gst_number, office_address, phone_number, office_name, is_verified)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
@@ -25,7 +24,7 @@ exports.createUser = async (req, res, next) => {
         
         const { rows } = await db.query(query, values);
         
-        req.io.emit('user-created', rows[0]); 
+        if (req.io) req.io.emit('user-created', rows[0]); 
         
         res.status(201).json({ message: "User created successfully!", user: rows[0] });
     } catch (error) {
@@ -73,22 +72,40 @@ exports.deleteUser = async (req, res, next) => {
     const client = await db.connect();
     try {
         await client.query('BEGIN');
+
+        // 1. Delete Interests
         await client.query('DELETE FROM demand_interests WHERE broker_id = $1', [id]);
-        await client.query('DELETE FROM demands WHERE trader_id = $1', [id]);
-        await client.query('DELETE FROM listings WHERE trader_id = $1', [id]);
-        await client.query('DELETE FROM watchlist WHERE user_id = $1', [id]);
         await client.query('DELETE FROM listing_interests WHERE interested_user_id = $1', [id]);
+
+        // 2. Delete Offers & Reviews (Prevents Foreign Key Errors)
+        await client.query('DELETE FROM offers WHERE buyer_id = $1 OR seller_id = $1', [id]);
+        await client.query('DELETE FROM reviews WHERE reviewer_id = $1 OR reviewee_id = $1', [id]);
+
+        // 3. Delete Notifications & Watchlist
+        await client.query('DELETE FROM notifications WHERE user_id = $1', [id]);
+        await client.query('DELETE FROM watchlist WHERE user_id = $1', [id]);
+
+        // 4. Delete Demands & Listings (FIX: Used 'user_id' instead of 'trader_id')
+        await client.query('DELETE FROM demands WHERE user_id = $1', [id]);
+        await client.query('DELETE FROM listings WHERE user_id = $1', [id]);
+
+        // 5. Finally, Delete the User
         const deleteQuery = 'DELETE FROM users WHERE user_id = $1 RETURNING user_id, full_name';
         const result = await client.query(deleteQuery, [id]);
+        
         if (result.rowCount === 0) {
             await client.query('ROLLBACK');
             return res.status(404).json({ message: 'User not found' });
         }
+
         await client.query('COMMIT');
-        req.io.emit('user-deleted', { userId: id });
+        
+        if (req.io) req.io.emit('user-deleted', { userId: id });
+        
         res.json({ message: `User '${result.rows[0].full_name}' was deleted successfully.` });
     } catch (error) {
         await client.query('ROLLBACK');
+        console.error("Delete User Error:", error);
         next(error);
     } finally {
         client.release();
@@ -223,16 +240,10 @@ exports.toggleUserVerification = async (req, res, next) => {
     }
 };
 
-// ## --- NEW FUNCTION ADDED --- ##
-//
-// @desc    Get all reviews and stats for a specific user
-// @route   GET /api/users/:id/reviews
-// @access  Private
 exports.getUserReviews = async (req, res, next) => {
     const { id } = req.params;
 
     try {
-        // Query 1: Get the stats (Average Rating and Total Count)
         const statsQuery = `
             SELECT 
                 AVG(rating) AS average_rating, 
@@ -242,7 +253,6 @@ exports.getUserReviews = async (req, res, next) => {
         `;
         const statsResult = await db.query(statsQuery, [id]);
         
-        // Query 2: Get the list of all reviews, joining with user table for reviewer's name
         const reviewsQuery = `
             SELECT r.review_id, r.rating, r.review_text, r.created_at, u.full_name AS reviewer_name, u.profile_photo_url AS reviewer_photo
             FROM reviews r
@@ -252,12 +262,10 @@ exports.getUserReviews = async (req, res, next) => {
         `;
         const reviewsResult = await db.query(reviewsQuery, [id]);
 
-        // Format the stats (handle null/0 cases)
         const stats = statsResult.rows[0];
         const average_rating = stats.average_rating ? parseFloat(stats.average_rating).toFixed(1) : 0;
         const total_reviews = parseInt(stats.total_reviews, 10);
 
-        // Send the combined response
         res.status(200).json({
             stats: {
                 average_rating: average_rating,

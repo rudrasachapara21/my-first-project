@@ -1,143 +1,159 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import apiClient from '../api/axiosConfig';
 import PageHeader from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
+import { PiCheckCircle, PiCurrencyInr, PiXCircle } from "react-icons/pi";
 
-// --- (Styled-components, no changes) ---
+// --- Styles ---
 const Container = styled.div``;
+
 const OfferList = styled.div`
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
 `;
+
 const OfferCard = styled.div`
   background: ${props => props.theme.bgSecondary};
   border: 1px solid ${props => props.theme.borderColor};
   border-radius: 16px;
   padding: 1.5rem;
+  position: relative;
+  transition: all 0.2s;
+  
+  /* Dim card if another offer won */
+  opacity: ${props => props.$dim ? 0.5 : 1};
+  filter: ${props => props.$dim ? 'grayscale(100%)' : 'none'};
+  pointer-events: ${props => props.$dim ? 'none' : 'auto'};
 `;
-const OfferInfo = styled.p`
-  margin: 0.25rem 0;
-  color: ${props => props.theme.textSecondary};
-  font-size: 0.9rem;
-`;
-const OfferPrice = styled.span`
-  font-weight: bold;
-  font-size: 1.2rem;
-  color: ${props => props.theme.textPrimary};
-`;
-const OfferStatus = styled.span`
-  font-weight: bold;
-  text-transform: capitalize;
-  color: ${props => props.color};
-`;
-const OfferActions = styled.div`
+
+const OfferHeader = styled.div`
   display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
 `;
-// ## CHANGE: Updated button styling ##
+
+const BuyerName = styled.div`
+  font-weight: 600;
+  font-size: 1.1rem;
+`;
+
+const OfferDate = styled.div`
+  font-size: 0.85rem;
+  color: ${props => props.theme.textSecondary};
+`;
+
+const PriceTag = styled.div`
+  font-family: 'Clash Display', sans-serif;
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: ${props => props.theme.textPrimary};
+  display: flex;
+  align-items: center;
+  gap: 4px;
+`;
+
+const StatusBadge = styled.span`
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: capitalize;
+    background-color: ${props => props.bg};
+    color: ${props => props.color};
+  margin-top: 0.5rem;
+`;
+
+const ActionGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-top: 1.5rem;
+`;
+
 const ActionButton = styled.button`
-  flex: 1;
   padding: 0.75rem;
   border-radius: 8px;
-  border: 1px solid transparent;
   font-weight: 600;
   cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 0.1s;
+
+  &:active { transform: scale(0.98); }
+
+  /* Default (Counter) */
   background-color: ${props => props.theme.bgPrimary};
   color: ${props => props.theme.textPrimary};
   border-color: ${props => props.theme.borderColor};
 
-  &:hover {
-    background-color: ${props => props.theme.borderColor};
-  }
-
-  ${props => props.$accept && `
-    background-color: #22c55e;
-    border-color: #22c55e;
-    color: white;
-    &:hover { background-color: #16a34a; }
-  `}
+  /* Accept Green */
+    ${props => props.$variant === 'accept' && `
+        background-color: ${props.theme.success};
+        color: ${props.theme.background || '#fff'};
+        &:hover { background-color: ${props.theme.success}; opacity: 0.95; }
+    `}
   
-  ${props => props.$reject && `
-    background-color: #ef4444;
-    border-color: #ef4444;
-    color: white;
-    &:hover { background-color: #dc2626; }
-  `}
+  /* Reject Red */
+    ${props => props.$variant === 'reject' && `
+        background-color: ${props.theme.error};
+        color: ${props.theme.background || '#fff'};
+        &:hover { background-color: ${props.theme.error}; opacity: 0.95; }
+    `}
 
   &:disabled {
-    background-color: ${props => props.theme.borderColor};
-    color: ${props => props.theme.textSecondary};
+    opacity: 0.5;
     cursor: not-allowed;
   }
 `;
 
-// ## NEW: Modal styles (copied from ListingDetailPage.jsx) ##
-const ModalBackdrop = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-`;
-const ModalContent = styled.div`
-  background: ${props => props.theme.bgSecondary};
-  padding: 2rem;
+// --- Success Banner ---
+const SuccessBanner = styled.div`
+    background: ${props => props.theme.success}22; /* translucent success */
+    color: ${props => props.theme.success};
+    border: 1px solid ${props => props.theme.success}33;
+  padding: 1.5rem;
+  margin: 1rem 1.5rem 0;
   border-radius: 12px;
-  width: 90%;
-  max-width: 400px;
-  text-align: center;
-`;
-const ModalTitle = styled.h2`
-  margin-top: 0;
-  font-family: 'Clash Display', sans-serif;
-`;
-const ModalInput = styled.input`
-  width: 100%;
-  padding: 0.8rem;
-  margin: 1rem 0;
-  border: 1px solid ${props => props.theme.borderColor};
-  border-radius: 6px;
-  font-size: 1rem;
-  box-sizing: border-box;
-  background: ${props => props.theme.bgPrimary};
-  color: ${props => props.theme.textPrimary};
-`;
-const ModalActions = styled.div`
   display: flex;
-  justify-content: center;
+  align-items: center;
   gap: 1rem;
-  margin-top: 1.5rem;
-`;
-const ModalButton = styled.button`
-  padding: 0.8rem 1.5rem;
-  border-radius: 8px;
-  border: 1px solid ${props => props.primary ? 'transparent' : props.theme.borderColor};
-  font-weight: 600;
-  cursor: pointer;
-  background: ${props => props.primary ? props.theme.accentPrimary : 'transparent'};
-  color: ${props => props.primary ? 'white' : props.theme.textPrimary};
+  animation: fadeIn 0.5s ease;
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 `;
 
+// --- Modal Styles ---
+const ModalBackdrop = styled.div`
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1000;
+`;
+const ModalContent = styled.div`
+  background: ${props => props.theme.bgSecondary}; padding: 2rem; border-radius: 12px; width: 90%; max-width: 400px; text-align: center;
+  border: 1px solid ${props => props.theme.borderColor};
+`;
+const ModalInput = styled.input`
+  width: 100%; padding: 1rem; margin: 1.5rem 0; 
+  border: 1px solid ${props => props.theme.borderColor};
+  border-radius: 8px; font-size: 1.1rem; 
+  background: ${props => props.theme.bgPrimary}; color: ${props => props.theme.textPrimary};
+`;
 
 function ListingOffersPage() {
     const { listingId } = useParams();
-    const navigate = useNavigate();
     const { user } = useAuth();
     const [offers, setOffers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     
-    // ## NEW: State for counter-offer modal ##
+    // Modal State
     const [isCounterModalOpen, setCounterModalOpen] = useState(false);
     const [currentOffer, setCurrentOffer] = useState(null);
     const [newCounterPrice, setNewCounterPrice] = useState('');
@@ -146,37 +162,37 @@ function ListingOffersPage() {
         if (!user) return;
         setIsLoading(true);
         try {
-            // This endpoint is correct, it gets all offers for the listing
             const response = await apiClient.get(`/api/listings/${listingId}/offers`);
             setOffers(response.data);
         } catch (error) {
-            console.error("Failed to fetch offers for listing:", error);
+            console.error("Failed to fetch offers:", error);
         } finally {
             setIsLoading(false);
         }
     };
 
-    useEffect(() => {
-        fetchOffers();
-    }, [listingId, user]);
+    useEffect(() => { fetchOffers(); }, [listingId, user]);
 
-    // ## NEW: Central function to handle ALL responses ##
     const handleResponse = async (offerId, responseType, price = null) => {
+        if (responseType === 'accept') {
+            const confirm = window.confirm("Are you sure? This will SELL the diamond and create a Transaction record.");
+            if (!confirm) return;
+        }
+
         setIsSubmitting(true);
         try {
-            // We send all responses to the new single endpoint
             await apiClient.put(`/api/offers/${offerId}/respond`, {
                 responseType: responseType,
                 newPrice: price
             });
-            
-            // Close modal if it was open
+
             if (isCounterModalOpen) {
                 setCounterModalOpen(false);
                 setNewCounterPrice('');
             }
             
-            fetchOffers(); // Refresh the list
+            // Just refresh data, don't use annoying alerts
+            fetchOffers(); 
         } catch (error) { 
             alert(error.response?.data?.message || `Failed to ${responseType} offer.`); 
         } finally {
@@ -184,94 +200,114 @@ function ListingOffersPage() {
         }
     };
 
-    // ## NEW: Helper functions to open/close the modal ##
     const openCounterModal = (offer) => {
         setCurrentOffer(offer);
-        // Pre-fill the input with a price slightly higher than the offer
         setNewCounterPrice(Math.round(offer.offer_price * 1.05)); 
         setCounterModalOpen(true);
     };
     
     const onCounterModalSubmit = () => {
         if (!newCounterPrice || isNaN(newCounterPrice) || newCounterPrice <= 0) {
-            alert('Please enter a valid counter-offer price.');
+            alert('Please enter a valid price.');
             return;
         }
         handleResponse(currentOffer.offer_id, 'counter', newCounterPrice);
     };
 
-    // ## NEW: Improved status text and colors ##
-    const getStatusColor = (status) => {
-        if (status === 'accepted') return '#22c55e';
-        if (status === 'rejected') return '#ef4444';
-        if (status === 'pending_buyer') return '#f59e0b';
-        return '#64748b'; // pending_seller
-    };
-
-    const getStatusText = (status) => {
-        if (status === 'pending_seller') return 'Pending Your Response';
-        if (status === 'pending_buyer') return 'Waiting for Buyer Response';
-        return status; // 'accepted', 'rejected'
-    };
+    // Helper to check if deal is closed
+    const winningOffer = offers.find(o => o.status === 'accepted');
 
     return (
         <Container>
-            <PageHeader title={`Offers for Listing #${listingId}`} backTo={`/listing/${listingId}`} />
+            <PageHeader title="Manage Offers" backTo={-1} />
+            
+            {/* --- SUCCESS BANNER (If Sold) --- */}
+            {winningOffer && (
+                <SuccessBanner>
+                    <PiCheckCircle size={32} />
+                    <div>
+                        <h3 style={{margin: 0}}>Sold to {winningOffer.buyer_name}!</h3>
+                        <p style={{margin: '4px 0 0', fontSize: '0.9rem'}}>
+                            Transaction Created. Final Price: ₹{parseInt(winningOffer.offer_price).toLocaleString('en-IN')}
+                        </p>
+                    </div>
+                </SuccessBanner>
+            )}
+
             <OfferList>
                 {isLoading ? (
-                    <p style={{textAlign: 'center'}}>Loading offers...</p>
+                    <p style={{textAlign: 'center', opacity: 0.6}}>Checking for offers...</p>
                 ) : offers.length === 0 ? (
-                    <p style={{textAlign: 'center'}}>No offers have been received for this listing yet.</p>
+                    <div style={{textAlign: 'center', padding: '2rem', border: '1px dashed var(--border-color)', borderRadius: '12px'}}>
+                        <h3>No Offers Yet</h3>
+                        <p>Wait for traders to bid on your diamond.</p>
+                    </div>
                 ) : (
-                    offers.map(offer => (
-                        <OfferCard key={offer.offer_id}>
-                            <OfferInfo>
-                                Offer from: <strong>{offer.buyer_name}</strong>
-                            </OfferInfo>
-                            <OfferInfo>
-                                Price: <OfferPrice>₹{parseInt(offer.offer_price, 10).toLocaleString('en-IN')}</OfferPrice>
-                            </OfferInfo>
-                             <OfferInfo>
-                                Status: <OfferStatus color={getStatusColor(offer.status)}>{getStatusText(offer.status)}</OfferStatus>
-                            </OfferInfo>
-                            
-                            {/* ## NEW: Show buttons only if it's the seller's turn ## */}
-                            {offer.status === 'pending_seller' && (
-                                <OfferActions>
-                                    <ActionButton $accept onClick={() => handleResponse(offer.offer_id, 'accept')} disabled={isSubmitting}>
-                                        Accept
-                                    </ActionButton>
-                                    <ActionButton $reject onClick={() => handleResponse(offer.offer_id, 'reject')} disabled={isSubmitting}>
-                                        Reject
-                                    </ActionButton>
-                                    <ActionButton onClick={() => openCounterModal(offer)} disabled={isSubmitting}>
-                                        Counter
-                                    </ActionButton>
-                                </OfferActions>
-                            )}
-                        </OfferCard>
-                    ))
+                    offers.map(offer => {
+                        const isWinner = offer.status === 'accepted';
+                        // If there is a winner, dim everyone else
+                        const isDimmed = winningOffer && !isWinner;
+
+                        return (
+                            <OfferCard key={offer.offer_id} $dim={isDimmed}>
+                                <OfferHeader>
+                                    <div>
+                                        <BuyerName>{offer.buyer_name}</BuyerName>
+                                        <OfferDate>{new Date(offer.updated_at).toLocaleDateString()}</OfferDate>
+                                    </div>
+                                    <PriceTag>
+                                        <PiCurrencyInr />
+                                        {parseInt(offer.offer_price).toLocaleString('en-IN')}
+                                    </PriceTag>
+                                </OfferHeader>
+
+                                {/* Status Badge */}
+                                {offer.status === 'pending_seller' && <StatusBadge bg={'var(--accent-primary)'} color={'var(--bg-primary)'}>Your Turn</StatusBadge>}
+                                {offer.status === 'pending_buyer' && <StatusBadge bg={'var(--info)'} color={'var(--bg-primary)'}>Waiting for Buyer</StatusBadge>}
+                                {offer.status === 'rejected' && <StatusBadge bg={'var(--error)'} color={'var(--bg-primary)'}>Rejected</StatusBadge>}
+                                {offer.status === 'accepted' && <StatusBadge bg={'var(--success)'} color={'var(--bg-primary)'}>Accepted & Sold</StatusBadge>}
+
+                                {/* Action Buttons (Only show if active and no deal closed yet) */}
+                                {offer.status === 'pending_seller' && !winningOffer && (
+                                    <ActionGrid>
+                                        <ActionButton $variant="accept" onClick={() => handleResponse(offer.offer_id, 'accept')} disabled={isSubmitting}>
+                                            Accept
+                                        </ActionButton>
+                                        <ActionButton $variant="reject" onClick={() => handleResponse(offer.offer_id, 'reject')} disabled={isSubmitting}>
+                                            Reject
+                                        </ActionButton>
+                                        <ActionButton onClick={() => openCounterModal(offer)} disabled={isSubmitting}>
+                                            Counter
+                                        </ActionButton>
+                                    </ActionGrid>
+                                )}
+                            </OfferCard>
+                        );
+                    })
                 )}
             </OfferList>
 
-            {/* ## NEW: Counter-offer Modal ## */}
+            {/* Counter Modal */}
             {isCounterModalOpen && (
-                <ModalBackdrop>
-                    <ModalContent>
-                        <ModalTitle>Make a Counter-Offer</ModalTitle>
-                        <p>Buyer's Offer: ₹{parseInt(currentOffer?.offer_price, 10).toLocaleString('en-IN')}</p>
+                <ModalBackdrop onClick={() => setCounterModalOpen(false)}>
+                    <ModalContent onClick={e => e.stopPropagation()}>
+                        <h2 style={{marginTop: 0}}>Counter Offer</h2>
+                        <p>Suggest a new price for <strong>{currentOffer?.buyer_name}</strong></p>
+                        
                         <ModalInput 
                             type="number" 
-                            placeholder="Your counter-offer price (INR)" 
+                            autoFocus
+                            placeholder="Enter Amount" 
                             value={newCounterPrice} 
                             onChange={e => setNewCounterPrice(e.target.value)} 
                         />
-                        <ModalActions>
-                            <ModalButton onClick={() => setCounterModalOpen(false)}>Cancel</ModalButton>
-                            <ModalButton primary onClick={onCounterModalSubmit} disabled={isSubmitting}>
+                        
+                        <div style={{display: 'flex', gap: '1rem', justifyContent: 'center'}}>
+                            <ActionButton onClick={() => setCounterModalOpen(false)}>Cancel</ActionButton>
+                            <ActionButton $variant="accept" onClick={onCounterModalSubmit} disabled={isSubmitting}>
                                 {isSubmitting ? 'Sending...' : 'Send Counter'}
-                            </ModalButton>
-                        </ModalActions>
+                            </ActionButton>
+                        </div>
                     </ModalContent>
                 </ModalBackdrop>
             )}

@@ -2,37 +2,149 @@ import React, { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import apiClient from '../api/axiosConfig';
-import { PiStar, PiStarFill, PiMagnifyingGlass, PiFunnelSimple, PiChatCircleDots, PiStorefront, PiTag } from "react-icons/pi";
+import { 
+  PiStar, PiStarFill, PiMagnifyingGlass, PiFunnelSimple, 
+  PiChatCircleDots, PiStorefront, PiTag, PiTrash, PiXBold
+} from "react-icons/pi";
 import { useAuth } from '../context/AuthContext';
 import PageHeader from '../components/PageHeader';
+import GlassCard from '../components/GlassCard';
 import { SkeletonListingCard } from '../components/SkeletonCard';
 import EmptyState from '../components/EmptyState';
 
-// --- (All styled components remain the same) ---
-const Container = styled.div``;
+// --- STYLED COMPONENTS ---
+const Container = styled.div`
+  background-color: ${props => props.theme.bgPrimary};
+  min-height: 100vh;
+`;
+
 const TabNav = styled.div` display: flex; background-color: ${props => props.theme.borderColor}; border-radius: 12px; padding: 5px; margin: 1.5rem; `;
-const TabButton = styled.button` flex: 1; padding: 0.75rem; border: none; font-size: 1rem; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; font-family: 'Inter', sans-serif; color: ${props => props.$active ? '#FFFFFF' : props.theme.textSecondary}; background-color: ${props => props.$active ? props.theme.accentPrimary : 'transparent'}; `;
-const ControlsContainer = styled.div` display: flex; gap: 1rem; align-items: center; padding: 0 1.5rem; margin-bottom: 2rem; `;
-const SearchInputContainer = styled.div` position: relative; flex: 1 1 auto; min-width: 0; `;
-const SearchInput = styled.input` width: 100%; padding: 0.8rem 1rem 0.8rem 3rem; border-radius: 12px; border: 1px solid ${props => props.theme.borderColor}; background: ${props => props.theme.bgSecondary}; color: ${props => props.theme.textPrimary}; font-size: 1rem; &::placeholder { color: ${props => props.theme.textSecondary}; } `;
-const SearchIcon = styled(PiMagnifyingGlass)` position: absolute; top: 50%; left: 1rem; transform: translateY(-50%); color: ${props => props.theme.textSecondary}; `;
-const SortWrapper = styled.div` position: relative; flex-shrink: 0; `;
-const FilterButton = styled.button` background: ${props => props.theme.bgSecondary}; border: 1px solid ${props => props.theme.borderColor}; color: ${props => props.theme.textPrimary}; border-radius: 12px; padding: 0.8rem 1.25rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 1rem; `;
-const FilterDropdown = styled.div` position: absolute; top: calc(100% + 5px); right: 0; background: ${props => props.theme.bgSecondary}; border: 1px solid ${props => props.theme.borderColor}; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); z-index: 10; width: 200px; padding: 0.5rem 0; `;
-const DropdownItem = styled.div` padding: 0.75rem 1rem; cursor: pointer; &:hover { background: ${props => props.theme.bgPrimary}; } color: ${props => props.selected ? props.theme.accentPrimary : props.theme.textPrimary}; font-weight: ${props => props.selected ? '600' : '400'}; `;
-const FeedContainer = styled.div` padding: 0 1.5rem 2rem 1.5rem; display: flex; flex-direction: column; gap: 2rem; `;
-const ListingCard = styled.div` background: ${props => props.theme.bgSecondary}; border-radius: 16px; border: 1px solid ${props => props.theme.borderColor}; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); `;
+const TabButton = styled.button` flex: 1; padding: 0.75rem; border: none; font-size: 1rem; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; font-family: 'Inter', sans-serif; color: ${props => props.$active ? props.theme.textPrimary : props.theme.textSecondary}; background-color: ${props => props.$active ? props.theme.accentPrimary : 'transparent'}; `;
+
+// ✅ FIXED: Unified flex container for perfect horizontal alignment
+const ControlsContainer = styled.div` 
+  display: flex; 
+  gap: 12px; 
+  align-items: center; 
+  padding: 0 1.5rem; 
+  margin-bottom: 2rem; 
+  width: 100%;
+  box-sizing: border-box;
+`;
+
+const SearchInputContainer = styled.div` 
+  position: relative; 
+  flex: 1; 
+  display: flex;
+  align-items: center;
+`;
+
+// ✅ FIXED: Height and border consistency
+const SearchInput = styled.input` 
+  width: 100%; 
+  height: 48px; /* Fixed height for alignment */
+  padding: 0 1rem 0 3.2rem; 
+  border-radius: 14px; 
+  border: 1px solid ${props => props.theme.borderColor}; 
+  background: ${props => props.theme.bgSecondary}; 
+  color: ${props => props.theme.textPrimary}; 
+  font-size: 1rem; 
+  transition: border-color 0.2s;
+
+  &:focus {
+    outline: none;
+    border-color: ${props => props.theme.accentPrimary};
+  }
+`;
+
+const SearchIcon = styled(PiMagnifyingGlass)` 
+  position: absolute; 
+  top: 50%; 
+  left: 1.2rem; 
+  transform: translateY(-50%); 
+  color: ${props => props.theme.textSecondary}; 
+  font-size: 1.2rem;
+  z-index: 2;
+`;
+
+// ✅ FIXED: Button UI hierarchy and alignment
+const FilterTrigger = styled.button` 
+  height: 48px; /* Matches SearchInput height exactly */
+  background: ${props => props.$active ? props.theme.accentPrimary : props.theme.bgSecondary}; 
+  border: 1px solid ${props => props.$active ? props.theme.accentPrimary : props.theme.borderColor}; 
+  color: ${props => props.$active ? 'white' : props.theme.textPrimary}; 
+  border-radius: 14px; 
+  padding: 0 1.5rem; 
+  cursor: pointer; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  gap: 0.5rem; 
+  font-weight: 600;
+  flex-shrink: 0; /* Prevents button from squishing */
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${props => props.$active ? props.theme.accentPrimary : props.theme.borderColor};
+  }
+`;
+
+// ✅ FEATURE: Professional Filter Drawer
+const FilterDrawer = styled.div`
+  position: fixed; top: 0; right: 0; width: 85%; max-width: 400px; height: 100%;
+  background: ${props => props.theme.bgSecondary}; z-index: 5000;
+  box-shadow: -10px 0 30px rgba(0,0,0,0.1);
+  padding: 2rem; display: flex; flex-direction: column;
+  transform: translateX(${props => props.$isOpen ? '0' : '100%'});
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+`;
+
+const DrawerOverlay = styled.div`
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5); z-index: 4999;
+  display: ${props => props.$isOpen ? 'block' : 'none'};
+`;
+
+const FilterSection = styled.div` margin-bottom: 2rem; `;
+const FilterLabel = styled.h4` color: ${props => props.theme.textPrimary}; margin-bottom: 1rem; font-size: 1.1rem; display: flex; justify-content: space-between; `;
+const RangeInput = styled.input` width: 100%; margin: 10px 0; accent-color: ${props => props.theme.accentPrimary}; `;
+
+const ShapeGrid = styled.div` display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; `;
+const ShapeChip = styled.button` 
+  padding: 8px; border-radius: 8px; border: 1px solid ${props => props.$selected ? props.theme.accentPrimary : props.theme.borderColor};
+  background: ${props => props.$selected ? props.theme.accentPrimary + '15' : 'transparent'};
+  color: ${props => props.$selected ? props.theme.accentPrimary : props.theme.textSecondary};
+  cursor: pointer; font-size: 0.85rem; font-weight: 500;
+`;
+
+// --- Feed Components ---
+const FeedContainer = styled(GlassCard)`
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  border-radius: 28px;
+`;
+const ListingCardWrapper = styled(Link)` text-decoration: none; color: inherit; display: block; `;
+const ListingCard = styled.div` background: ${props => props.theme.bgSecondary}; border-radius: 20px; border: 1px solid ${props => props.theme.borderColor}; overflow: hidden; box-shadow: ${props => props.theme.cardShadow || '0 4px 15px rgba(0,0,0,0.05)'}; `;
 const ListingImageWrapper = styled.div` position: relative; `;
-const ListingImage = styled.img` width: 100%; height: 250px; object-fit: cover; background-color: ${props => props.theme.bgPrimary}; `;
+const ListingImage = styled.img` width: 100%; height: 260px; object-fit: cover; background-color: ${props => props.theme.bgPrimary}; `;
 const ListingContent = styled.div` padding: 1.5rem; `;
-const ListingTitle = styled.h3` font-family: 'Clash Display', sans-serif; font-size: 1.3rem; font-weight: 600; margin: 0; `;
-const ListingPrice = styled.p` font-size: 1.2rem; color: ${props => props.theme.accentPrimary}; font-weight: bold; margin: 0.5rem 0; `;
-const ListingSpecs = styled.p` font-size: 0.9rem; color: ${props => props.theme.textSecondary}; margin: 0; `;
-const CtaButton = styled.button` width: 100%; padding: 1rem; border: none; border-radius: 12px; background: ${props => props.theme.textPrimary}; color: ${props => props.theme.bgSecondary}; font-family: 'Clash Display', sans-serif; font-size: 1.2rem; font-weight: 600; cursor: pointer; margin-top: 1.5rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: background-color 0.2s; &:hover { background-color: ${props => props.theme.accentPrimary}; color: white; }`;
-const WatchlistButton = styled.button` background: none; border: none; cursor: pointer; color: ${props => props.theme.accentSecondary}; font-size: 1.5rem; padding: 0; position: absolute; top: 1rem; right: 1rem; background-color: rgba(0,0,0,0.3); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; `;
-const ListingCardWrapper = styled(Link)`
-  text-decoration: none;
-  color: inherit;
+const ListingTitle = styled.h3` font-family: 'Clash Display', sans-serif; font-size: 1.3rem; font-weight: 600; color: ${props => props.theme.textPrimary}; margin: 0; `;
+const ListingPrice = styled.p` font-size: 1.4rem; color: ${props => props.theme.accentPrimary}; font-weight: 800; margin: 0.5rem 0; `;
+const StatusBadge = styled.div`
+  position: absolute; top: 1rem; left: 1rem; padding: 0.5rem 1rem; border-radius: 10px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: white;
+  background: ${props => props.$status === 'sold' ? props.theme.error : props.$status === 'pending' ? props.theme.info : props.theme.success};
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+`;
+
+const WatchlistButton = styled.button` 
+  position: absolute; top: 1rem; right: 1rem; width: 40px; height: 40px; border-radius: 50%; border: none;
+  background: ${props => props.theme.surfaceGlass}; backdrop-filter: blur(6px); color: ${props => props.theme.textPrimary}; display: flex; align-items: center; justify-content: center; cursor: pointer;
+`;
+
+const ApplyButton = styled.button`
+  width: 100%; padding: 1.2rem; background: ${props => props.theme.accentPrimary}; color: white; border: none; border-radius: 14px; font-weight: 700; font-size: 1.1rem; cursor: pointer; margin-top: auto;
 `;
 
 function BuyFeed() {
@@ -41,16 +153,20 @@ function BuyFeed() {
   const { user } = useAuth();
   
   const [activeTab, setActiveTab] = useState(location.state?.defaultTab || 'buyFeed');
-  
   const [listings, setListings] = useState([]);
   const [myListings, setMyListings] = useState([]);
   const [watchlist, setWatchlist] = useState(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Filter States
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('price-desc');
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [priceRange, setPriceRange] = useState(1000000); 
+  const [caratRange, setCaratRange] = useState(5.0); 
+  const [selectedShape, setSelectedShape] = useState('All');
 
   const API_ROOT_URL = import.meta.env.VITE_API_URL.replace('/api', '');
+  const shapes = ['All', 'Round', 'Princess', 'Pear', 'Oval', 'Emerald', 'Heart', 'Marquise'];
 
   useEffect(() => {
     if (!user) return;
@@ -58,167 +174,111 @@ function BuyFeed() {
       setIsLoading(true);
       try {
         const endpoint = activeTab === 'buyFeed' ? '/api/listings' : '/api/listings/my-listings';
-        // ## FIX: Only fetch watchlist when on the 'buyFeed' tab ##
-        const listingsPromise = apiClient.get(endpoint);
+        const [listingsRes, watchlistRes] = await Promise.all([
+          apiClient.get(endpoint),
+          activeTab === 'buyFeed' ? apiClient.get('/api/watchlist').catch(() => ({data: []})) : {data: []}
+        ]);
         
-        let watchlistData = new Set();
-        if (activeTab === 'buyFeed') {
-          const watchlistRes = await apiClient.get('/api/watchlist');
-          watchlistData = new Set(watchlistRes.data.map(item => item.listing_id));
-        }
-
-        const listingsRes = await listingsPromise;
+        if (activeTab === 'buyFeed') setListings(listingsRes.data);
+        else setMyListings(listingsRes.data);
         
-        if (activeTab === 'buyFeed') { 
-          setListings(listingsRes.data); 
-        } else { 
-          setMyListings(listingsRes.data); 
-        }
-        setWatchlist(watchlistData);
-        
-      } catch (error) { console.error("Failed to fetch feed data:", error); } 
+        setWatchlist(new Set(watchlistRes.data.map(item => item.listing_id)));
+      } catch (error) { console.error("Fetch error:", error); } 
       finally { setIsLoading(false); }
     };
     fetchFeedData();
   }, [user, activeTab]);
-  
-  const handleStartConversation = async (seller) => {
-    try {
-        const response = await apiClient.post('/api/conversations', { recipientId: seller.trader_id });
-        navigate(`/chat/${response.data.conversation_id}`, { state: { partnerName: seller.trader_name } });
-    } catch (error) { alert(error.response?.data?.message || "Could not start conversation."); }
-  };
 
-  const toggleWatchlist = async (listingId) => {
-    const newWatchlist = new Set(watchlist);
-    try {
-        if (newWatchlist.has(listingId)) {
-            newWatchlist.delete(listingId);
-            await apiClient.delete(`/api/watchlist/${listingId}`);
-        } else {
-            newWatchlist.add(listingId);
-            await apiClient.post(`/api/watchlist/${listingId}`);
-        }
-        setWatchlist(newWatchlist);
-    } catch (error) { console.error("Failed to update watchlist:", error); }
-  };
-  
-  const listToDisplay = activeTab === 'buyFeed' ? listings : myListings;
-
-  const filteredAndSortedListings = useMemo(() => {
-    return listToDisplay
-      .map(item => {
-        // This parsing logic is correct and robust
-        let detailsObject = {};
-        try { detailsObject = typeof item.diamond_details === 'string' ? JSON.parse(item.diamond_details) : item.diamond_details; } 
-        catch (e) { console.error("Failed to parse details for item:", item.listing_id); }
-        return { ...item, diamond_details: detailsObject };
-      })
-      // ## --- THIS IS THE FIX (Search Logic) --- ##
-      // Updated the filter to search on the new, correct fields
-      .filter(item => {
-        if (activeTab === 'myFeed') return true;
-        
-        const query = searchQuery.toLowerCase();
-        const details = item.diamond_details;
-        
-        return ( 
-          details.carat?.toString().includes(query) ||
-          details.clarity?.toLowerCase().includes(query) || 
-          details.color?.toLowerCase().includes(query) ||
-          details.cut?.toLowerCase().includes(query) ||
-          details.gia_report_number?.toLowerCase().includes(query)
-        );
-      })
-      // ## --- END OF FIX --- ##
-      .sort((a, b) => {
-        if (activeTab === 'myFeed') return 0;
-        if (sortBy === 'price-asc') return a.price - b.price;
-        if (sortBy === 'price-desc') return b.price - a.price;
-        return 0;
-      });
-  }, [listToDisplay, searchQuery, sortBy, activeTab]);
-
-  const renderContent = () => {
-    if (isLoading) { return <><SkeletonListingCard /><SkeletonListingCard /></>; }
-    if (filteredAndSortedListings.length === 0) {
-      const emptyStateTitle = activeTab === 'buyFeed' ? "No Listings Found" : "You Have No Listings";
-      const emptyStateMessage = activeTab === 'buyFeed' ? "There are currently no items in the feed that match your search." : "Items you post for sale will appear here.";
-      const emptyStateIcon = activeTab === 'buyFeed' ? PiStorefront : PiTag;
-      return <EmptyState icon={emptyStateIcon} title={emptyStateTitle} message={emptyStateMessage} />
-    }
-    return filteredAndSortedListings.map(item => {
-      const isSaved = watchlist.has(item.listing_id);
-      const isOwnListing = user?.id === item.trader_id;
+  const filteredListings = useMemo(() => {
+    const list = activeTab === 'buyFeed' ? listings : myListings;
+    return list.filter(item => {
+      const matchesSearch = searchQuery === '' || 
+        (item.shape || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.clarity || '').toLowerCase().includes(searchQuery.toLowerCase());
       
-      // ## --- THIS IS THE FIX (Display Logic) --- ##
-      // Updated the title and specs to show the new data
-      const details = item.diamond_details;
-      const title = `${details.carat || '?'}ct, ${details.color || ''} ${details.clarity || ''}, ${details.cut || ''} Cut`;
-      const giaInfo = details.gia_report_number ? `GIA: ${details.gia_report_number}` : '';
+      const price = parseFloat(item.price || 0);
+      const carat = parseFloat(item.carat || 0);
       
-      return (
-        <ListingCardWrapper to={`/listing/${item.listing_id}`} key={item.listing_id}>
-          <ListingCard>
-            <ListingImageWrapper>
-              <ListingImage src={item.image_urls && item.image_urls[0] ? `${API_ROOT_URL}${item.image_urls[0]}` : 'https://placehold.co/600x400'} alt={title} />
-              {/* Only show watchlist button on *other* people's listings */}
-              {!isOwnListing && (
-                <WatchlistButton onClick={(e) => { e.preventDefault(); toggleWatchlist(item.listing_id); }}>
-                  {isSaved ? <PiStarFill color="#FBBF24" /> : <PiStar color="#FFFFFF" />}
-                </WatchlistButton>
-              )}
-            </ListingImageWrapper>
-            <ListingContent>
-              <ListingTitle>{title}</ListingTitle>
-              <ListingPrice>₹{parseInt(item.price, 10).toLocaleString('en-IN')}</ListingPrice>
-              <ListingSpecs>{giaInfo}</ListingSpecs>
-              <ListingSpecs style={{ marginTop: '4px' }}>Seller: {item.trader_name}</ListingSpecs>
-              {/* ## --- END OF FIX --- ## */}
+      const matchesPrice = price <= priceRange;
+      const matchesCarat = carat <= caratRange;
+      const matchesShape = selectedShape === 'All' || item.shape === selectedShape;
 
-              {!isOwnListing && (
-                <CtaButton onClick={(e) => { e.preventDefault(); handleStartConversation(item); }}>
-                  <PiChatCircleDots /> Message Seller
-                </CtaButton>
-              )}
-            </ListingContent>
-          </ListingCard>
-        </ListingCardWrapper>
-      );
-    })
-  };
+      return matchesSearch && matchesPrice && matchesCarat && matchesShape;
+    });
+  }, [listings, myListings, activeTab, searchQuery, priceRange, caratRange, selectedShape]);
 
   return (
     <Container>
-      <PageHeader title={activeTab === 'buyFeed' ? "Buy Feed" : "My Feed"} />
+      <PageHeader title={activeTab === 'buyFeed' ? "Marketplace" : "My Inventory"} />
       
       <TabNav>
         <TabButton $active={activeTab === 'buyFeed'} onClick={() => setActiveTab('buyFeed')}>Buy Feed</TabButton>
         <TabButton $active={activeTab === 'myFeed'} onClick={() => setActiveTab('myFeed')}>My Feed</TabButton>
       </TabNav>
 
-      {activeTab === 'buyFeed' && (
-        <ControlsContainer>
-          <SearchInputContainer>
-            <SearchIcon size={20} />
-            <SearchInput placeholder="Search by Carat, GIA, Cut..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-          </SearchInputContainer>
-          <SortWrapper>
-            <FilterButton onClick={() => setShowFilterDropdown(p => !p)}>
-              <PiFunnelSimple /> Sort
-            </FilterButton>
-            {showFilterDropdown && (
-              <FilterDropdown onMouseLeave={() => setShowFilterDropdown(false)}>
-                <DropdownItem selected={sortBy === 'price-desc'} onClick={() => { setSortBy('price-desc'); setShowFilterDropdown(false); }}>Price: High to Low</DropdownItem>
-                <DropdownItem selected={sortBy === 'price-asc'} onClick={() => { setSortBy('price-asc'); setShowFilterDropdown(false); }}>Price: Low to High</DropdownItem>
-              </FilterDropdown>
-            )}
-          </SortWrapper>
-        </ControlsContainer>
-      )}
+      {/* ✅ UI FIX: Perfectly aligned search and filter */}
+      <ControlsContainer>
+        <SearchInputContainer>
+          <SearchIcon size={20} />
+          <SearchInput placeholder="Search shape or clarity..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+        </SearchInputContainer>
+        <FilterTrigger 
+           $active={priceRange < 1000000 || caratRange < 5 || selectedShape !== 'All'} 
+           onClick={() => setIsFilterOpen(true)}
+        >
+          <PiFunnelSimple size={20} /> Filter
+        </FilterTrigger>
+      </ControlsContainer>
+
+      {/* ✅ DRAWER UI FOR FILTERS */}
+      <DrawerOverlay $isOpen={isFilterOpen} onClick={() => setIsFilterOpen(false)} />
+      <FilterDrawer $isOpen={isFilterOpen}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2rem'}}>
+          <h2 style={{margin:0, fontFamily:'Clash Display'}}>Filters</h2>
+          <PiXBold size={24} onClick={() => setIsFilterOpen(false)} style={{cursor:'pointer'}} />
+        </div>
+
+        <FilterSection>
+          <FilterLabel>Max Price: <span>₹{(priceRange/100000).toFixed(1)}L</span></FilterLabel>
+          <RangeInput type="range" min="10000" max="1000000" step="10000" value={priceRange} onChange={e => setPriceRange(e.target.value)} />
+        </FilterSection>
+
+        <FilterSection>
+          <FilterLabel>Max Carat: <span>{caratRange}ct</span></FilterLabel>
+          <RangeInput type="range" min="0.1" max="5.0" step="0.1" value={caratRange} onChange={e => setCaratRange(e.target.value)} />
+        </FilterSection>
+
+        <FilterSection>
+          <FilterLabel>Diamond Shape</FilterLabel>
+          <ShapeGrid>
+            {shapes.map(s => (
+              <ShapeChip key={s} $selected={selectedShape === s} onClick={() => setSelectedShape(s)}>{s}</ShapeChip>
+            ))}
+          </ShapeGrid>
+        </FilterSection>
+
+        <ApplyButton onClick={() => setIsFilterOpen(false)}>Apply Filters</ApplyButton>
+      </FilterDrawer>
 
       <FeedContainer>
-        {renderContent()}
+        {isLoading ? <SkeletonListingCard /> : filteredListings.map(item => (
+          <ListingCardWrapper to={`/listing/${item.listing_id}`} key={item.listing_id}>
+            <ListingCard>
+              <ListingImageWrapper>
+                <ListingImage src={item.image_urls?.[0]?.startsWith('http') ? item.image_urls[0] : `${API_ROOT_URL}${item.image_urls?.[0] || '/placeholder.png'}`} />
+                {item.status !== 'available' && <StatusBadge $status={item.status}>{item.status}</StatusBadge>}
+              </ListingImageWrapper>
+              <ListingContent>
+                <ListingTitle>{item.carat}ct {item.shape} ({item.clarity})</ListingTitle>
+                <ListingPrice>₹{parseInt(item.price).toLocaleString('en-IN')}</ListingPrice>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:'1rem'}}>
+                  <span style={{fontSize:'0.85rem', color:'var(--text-secondary)'}}>Seller: {item.full_name}</span>
+                  <PiChatCircleDots size={24} color={'var(--accent-primary)'} />
+                </div>
+              </ListingContent>
+            </ListingCard>
+          </ListingCardWrapper>
+        ))}
       </FeedContainer>
     </Container>
   );

@@ -23,9 +23,15 @@ exports.getPriceEstimate = async (req, res) => {
         }
 
         // --- THE FIX IS HERE ---
-        // We clean the URL to remove any trailing slash, then append '/predict'
-        // This ensures we hit the specific route defined in your Python app.
-        const cleanBaseUrl = AI_SERVICE_URL.replace(/\/$/, ""); 
+        // 1. Remove trailing slash if present
+        let cleanBaseUrl = AI_SERVICE_URL.replace(/\/$/, ""); 
+        
+        // 2. Remove '/predict' from the end if it's already there (to prevent double /predict/predict)
+        if (cleanBaseUrl.endsWith('/predict')) {
+            cleanBaseUrl = cleanBaseUrl.replace('/predict', '');
+        }
+
+        // 3. Now safely add exactly one '/predict'
         const targetUrl = `${cleanBaseUrl}/predict`;
 
         console.log(`Sending request to AI Service: ${targetUrl}`); // Debug log
@@ -40,9 +46,11 @@ exports.getPriceEstimate = async (req, res) => {
         res.json({ estimated_price: aiResponse.data.estimated_price });
 
     } catch (error) {
-        // Detailed error logging to help us if it fails again
+        // Detailed error logging
         if (error.response) {
             console.error(`AI Error (${error.response.status}):`, error.response.data);
+            // Pass the specific error message from the AI service if available
+            return res.status(error.response.status).json(error.response.data);
         } else {
             console.error("AI Pricing error:", error.message);
         }

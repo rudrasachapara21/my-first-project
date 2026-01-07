@@ -15,19 +15,25 @@ export const NotificationProvider = ({ children }) => {
   const { user } = useAuth();
   const { socket } = useWebSocket();
 
+  // 1. Fetching Logic with user-check
   const fetchNotifications = useCallback(async () => {
     if (!user) {
         setNotifications([]);
         setUnreadCount(0);
+        setIsLoading(false);
         return;
     };
     
     setIsLoading(true);
     try {
-      // ## CHANGE: Using apiClient and added /api prefix ##
       const { data } = await apiClient.get('/api/notifications');
-      setNotifications(data);
-      setUnreadCount(data.length);
+      // Sort notifications by date (newest first)
+      const sortedData = data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      setNotifications(sortedData);
+      
+      // Calculate unread count correctly from data
+      const unread = sortedData.filter(n => !n.is_read).length;
+      setUnreadCount(unread);
     } catch (error) {
       console.error("Failed to fetch notifications:", error);
     } finally {
@@ -39,67 +45,95 @@ export const NotificationProvider = ({ children }) => {
     fetchNotifications();
   }, [fetchNotifications]);
 
+  // 2. WebSocket Real-time Sync
   useEffect(() => {
-    if (socket) {
-      socket.on('new_notification', (newNotification) => {
+    if (!socket || !user) return;
+
+    const handleNewNotification = (newNotification) => {
         setNotifications(prev => [newNotification, ...prev]);
         setUnreadCount(prev => prev + 1);
-      });
+    };
 
-      return () => socket.off('new_notification');
-    }
-  }, [socket]);
+    const handleNewArticle = (article) => {
+        const newsNotification = {
+            id: `news-${article.news_id}-${Date.now()}`, 
+            type: 'news',
+            message: `📰 News: ${article.title}`,
+            created_at: new Date().toISOString(),
+            is_read: false,
+            link: `/news/${article.news_id}` 
+        };
 
+        setNotifications(prev => [newsNotification, ...prev]);
+        setUnreadCount(prev => prev + 1);
+    };
+
+    socket.on('new_notification', handleNewNotification);
+    socket.on('new-article', handleNewArticle);
+
+    return () => {
+        socket.off('new_notification', handleNewNotification);
+        socket.off('new-article', handleNewArticle);
+    };
+  }, [socket, user]);
+
+  // 3. Mark as Read Logic (Optimistic UI Update)
   const markAsRead = async (notificationIds) => {
     if (!notificationIds || notificationIds.length === 0) return;
 
-    const originalNotifications = [...notifications];
-    const originalCount = unreadCount;
+    // Filter out IDs that are already marked as read in the UI
+    const targetIds = notificationIds.filter(id => {
+        const n = notifications.find(notif => notif.id === id);
+        return n && !n.is_read;
+    });
+
+    if (targetIds.length === 0) return;
 
     setNotifications(prev => 
-        prev.map(n => 
-            notificationIds.includes(n.id) ? { ...n, is_read: true } : n
-        )
+        prev.map(n => targetIds.includes(n.id) ? { ...n, is_read: true } : n)
     );
-    setUnreadCount(prev => prev > notificationIds.length ? prev - notificationIds.length : 0);
+    setUnreadCount(prev => Math.max(0, prev - targetIds.length));
 
     try {
-      // ## CHANGE: Using apiClient and added /api prefix ##
-      await apiClient.put('/api/notifications/read', { notificationIds });
+        const realIds = targetIds.filter(id => 
+            typeof id === 'number' || (typeof id === 'string' && !id.startsWith('news-'))
+        );
+        
+        if (realIds.length > 0) {
+            await apiClient.put('/api/notifications/read', { notificationIds: realIds });
+        }
     } catch (error) {
-      console.error("Failed to mark notifications as read:", error);
-      setNotifications(originalNotifications);
-      setUnreadCount(originalCount);
+      console.error("Failed to sync read status:", error);
+      fetchNotifications(); // Rollback to server state
     }
   };
 
   const dismissNotification = async (notificationId) => {
-    const originalNotifications = [...notifications];
-
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    setUnreadCount(prev => prev - 1);
+    
+    // Decrement count only if it was unread
+    const wasUnread = notifications.find(n => n.id === notificationId && !n.is_read);
+    if (wasUnread) setUnreadCount(prev => Math.max(0, prev - 1));
 
     try {
-      // ## CHANGE: Using apiClient and added /api prefix ##
-      await apiClient.put(`/api/notifications/${notificationId}/read`);
+      const isReal = typeof notificationId === 'number' || (typeof notificationId === 'string' && !notificationId.startsWith('news-'));
+      if (isReal) {
+          await apiClient.put(`/api/notifications/${notificationId}/read`);
+      }
     } catch (error) {
-      console.error("Failed to dismiss notification:", error);
-      setNotifications(originalNotifications);
-      setUnreadCount(prev => prev + 1);
+      fetchNotifications();
     }
   };
 
-  const value = { 
-    notifications, 
-    unreadCount, 
-    isLoading, 
-    markAsRead, 
-    dismissNotification,
-    refetch: fetchNotifications 
-  };
-
   return (
-    <NotificationContext.Provider value={value}>
+    <NotificationContext.Provider value={{ 
+        notifications, 
+        unreadCount, 
+        isLoading, 
+        markAsRead, 
+        dismissNotification,
+        refetch: fetchNotifications 
+    }}>
       {children}
     </NotificationContext.Provider>
   );

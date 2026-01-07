@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import apiClient from '../api/axiosConfig';
 import PageHeader from '../components/PageHeader';
-import { PiChatCircleDots, PiHand, PiCheckCircle, PiXCircle } from 'react-icons/pi';
+import { PiChatCircleDots, PiHand, PiCheckCircle, PiXCircle, PiClock } from 'react-icons/pi';
 import { useAuth } from '../context/AuthContext';
 
 // --- Styles ---
@@ -55,8 +55,6 @@ const DetailValue = styled.span`
   color: ${props => props.theme.textPrimary};
 `;
 
-// ## --- THIS IS THE FIX (Part 1) --- ##
-// Added cursor: pointer and a hover effect
 const TraderInfo = styled.div`
   display: flex;
   align-items: center;
@@ -70,7 +68,6 @@ const TraderInfo = styled.div`
     background-color: ${props => props.theme.bgPrimary};
   }
 `;
-// ## --- END OF FIX --- ##
 
 const Avatar = styled.img`
   width: 48px;
@@ -112,8 +109,11 @@ const ActionButton = styled.button`
   border: 1px solid ${props => props.$primary ? props.theme.accentPrimary : props.theme.borderColor};
 
   &:disabled {
-    opacity: 0.5;
+    opacity: 0.6;
     cursor: not-allowed;
+    background-color: ${props => props.theme.bgSecondary};
+    color: ${props => props.theme.textSecondary};
+    border-color: ${props => props.theme.borderColor};
   }
 `;
 const ButtonGroup = styled.div`
@@ -124,27 +124,20 @@ const ButtonGroup = styled.div`
   border-top: 1px solid ${props => props.theme.borderColor};
 `;
 const InterestButton = styled(ActionButton)`
-  background-color: ${props => props.$active ? props.theme.accentDangerLight : props.theme.accentPrimary};
-  color: ${props => props.$active ? props.theme.accentDanger : 'white'};
-  border-color: ${props => props.$active ? props.theme.accentDanger : props.theme.accentPrimary};
+  background-color: ${props => props.$active ? props.theme.accentSuccess : props.theme.accentPrimary};
+  color: white; 
+  border: none;
 `;
-// --- (End of Styles) ---
 
-
-// ## --- AVATAR HELPER FUNCTION --- ##
+// --- Helpers ---
 const getAvatarUrl = (photoUrl, name) => {
   const API_ROOT_URL = import.meta.env.VITE_API_URL.replace('/api', '');
   if (!photoUrl) {
     return `https://ui-avatars.com/api/?name=${name ? name.replace(' ', '+') : 'User'}&background=random`;
   }
-  if (photoUrl.startsWith('http')) {
-    // It's a Cloudinary URL, use it directly
-    return photoUrl;
-  }
-  // It's an old /uploads/ file, add the API root
+  if (photoUrl.startsWith('http')) return photoUrl;
   return `${API_ROOT_URL}${photoUrl}`;
 };
-
 
 function BrokerDemandView() {
   const { demandId } = useParams();
@@ -175,28 +168,33 @@ function BrokerDemandView() {
     fetchDemand();
   }, [demandId]);
 
-  const handleToggleInterest = async () => {
+  // --- RAISE HAND HANDLER ---
+  const handleRaiseHand = async () => {
     setIsProcessing(true);
     try {
-      await apiClient.post(`/api/demands/${demandId}/interest`);
-      setIsInterested(!isInterested);
+      await apiClient.post(`/api/demands/${demandId}/raise-hand`);
+      setIsInterested(true);
+      alert("Success! Hand raised. The seller has been notified.");
     } catch (err) {
-      alert("Failed to update interest. Please try again.");
-      console.error(err);
+      alert(err.response?.data?.message || "Failed to raise hand.");
     } finally {
       setIsProcessing(false);
     }
   };
   
+  // --- FIXED REQUEST DETAILS HANDLER ---
   const handleRequestDetails = async () => {
     setIsProcessing(true);
     try {
       const response = await apiClient.post(`/api/demands/${demandId}/request-details`);
       alert(response.data.message || "Details have been sent to your chat.");
-      navigate('/chats');
+      
+      // FIX: Changed from '/messages' to '/chats'
+      navigate('/chats'); 
     } catch (err) {
-      alert(error.response?.data?.message || "Failed to request details.");
+      // FIX: Using 'err' correctly
       console.error(err);
+      alert(err.response?.data?.message || "Failed to request details."); 
     } finally {
       setIsProcessing(false);
     }
@@ -218,12 +216,13 @@ function BrokerDemandView() {
   const d = demand.diamond_details;
   const t = demand.traderProfile;
   const isHired = demand.hired_broker_id === user.id;
+  const isOtherBrokerHired = demand.hired_broker_id && !isHired;
 
   const avatarUrl = getAvatarUrl(t.profile_photo_url, t.full_name);
   
   return (
     <Container>
-      <PageHeader title="Demand Details" backTo="/broker-home" />
+      <PageHeader title="Demand Details" backTo={-1} />
       <Content>
         <DemandCard>
           <CardHeader>
@@ -240,16 +239,22 @@ function BrokerDemandView() {
             </DetailItem>
             <DetailItem>
               <DetailLabel>Price/ct:</DetailLabel>
-              <DetailValue>${d.price_per_caret}</DetailValue>
+              <DetailValue>₹{d.price_per_caret}</DetailValue>
             </DetailItem>
             <DetailItem>
               <DetailLabel>Quantity:</DetailLabel>
               <DetailValue>{d.quantity}</DetailValue>
             </DetailItem>
+             <DetailItem>
+              <DetailLabel>Shape:</DetailLabel>
+              <DetailValue>{d.shape}</DetailValue>
+            </DetailItem>
+             <DetailItem>
+              <DetailLabel>Color:</DetailLabel>
+              <DetailValue>{d.color}</DetailValue>
+            </DetailItem>
           </DetailGrid>
           
-          {/* ## --- THIS IS THE FIX (Part 2) --- ## */}
-          {/* Added the onClick handler to navigate to the trader's profile */}
           <TraderInfo onClick={() => navigate(`/profile/${t.user_id}`)}>
             <Avatar src={avatarUrl} alt={t.full_name} />
             <TraderDetails>
@@ -257,31 +262,40 @@ function BrokerDemandView() {
               <TraderOffice>{t.office_name}</TraderOffice>
             </TraderDetails>
           </TraderInfo>
-          {/* ## --- END OF FIX --- ## */}
 
           <ButtonGroup>
             {isHired ? (
               <>
                 <ActionButton $primary disabled>
-                  <PiCheckCircle /> You are Hired
+                  <PiCheckCircle size={20} /> You are Hired for this Job
                 </ActionButton>
                 <ActionButton onClick={() => handleStartChat(t.user_id, t.full_name)}>
-                  <PiChatCircleDots /> Message Trader
+                  <PiChatCircleDots size={20} /> Message Trader
                 </ActionButton>
               </>
-            ) : demand.hired_broker_id ? (
+            ) : isOtherBrokerHired ? (
               <ActionButton disabled>
-                <PiXCircle /> Deal in Progress
+                <PiXCircle size={20} /> Deal in Progress (Other Broker)
               </ActionButton>
+            ) : isInterested ? (
+              <>
+                <ActionButton disabled>
+                   <PiClock size={20} /> Hand Raised (Waiting for Seller)
+                </ActionButton>
+                <ActionButton onClick={() => handleStartChat(t.user_id, t.full_name)}>
+                   <PiChatCircleDots size={20} /> Message Trader
+                </ActionButton>
+              </>
             ) : (
               <>
                 <InterestButton 
-                  $active={isInterested} 
-                  onClick={handleToggleInterest} 
+                  $primary
+                  onClick={handleRaiseHand} 
                   disabled={isProcessing}
                 >
-                  <PiHand /> {isInterested ? 'Withdraw Interest' : 'Show Interest'}
+                  <PiHand size={20} /> Raise Hand to Represent
                 </InterestButton>
+                
                 <ActionButton 
                   onClick={handleRequestDetails} 
                   disabled={isProcessing}

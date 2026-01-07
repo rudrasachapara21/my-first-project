@@ -1,15 +1,18 @@
 const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const cloudinary = require('cloudinary').v2;
+const dotenv = require('dotenv');
 
-// Configure Cloudinary with the keys from your .env file (or Render env)
+dotenv.config();
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Configure storage for PROFILE PHOTOS
+// --- 1. Existing Storages ---
+
 const profilePhotoStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -19,7 +22,6 @@ const profilePhotoStorage = new CloudinaryStorage({
   },
 });
 
-// Configure storage for LISTING IMAGES
 const listingImageStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -29,17 +31,74 @@ const listingImageStorage = new CloudinaryStorage({
   },
 });
 
-// ## --- NEW: Configure storage for CHAT DOCUMENTS --- ##
+// --- 🛑 FIXED: Explicitly handle PDFs for Chat Documents ---
 const documentStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'diamond-connect/chat-documents',
-    // We set 'resource_type: "auto"' to allow any file type (images, PDFs, etc.)
-    resource_type: 'auto',
+  params: async (req, file) => {
+    // Check if the uploaded file is a PDF
+    const isPdf = file.mimetype === 'application/pdf';
+
+    if (isPdf) {
+      // ✅ FIX: Force 'raw' for PDFs to prevent 401 Errors
+      return {
+        folder: 'diamond-connect/chat-documents',
+        resource_type: 'raw', // Critical for PDFs
+        use_filename: true,
+        unique_filename: true
+      };
+    } else {
+      // Treat everything else (images) as standard images
+      return {
+        folder: 'diamond-connect/chat-documents',
+        resource_type: 'image',
+        allowed_formats: ['jpg', 'png', 'jpeg', 'webp']
+      };
+    }
   },
 });
 
-// A specific filter for IMAGES ONLY
+// --- 2. UPDATED: COMPOSITE STORAGE WITH RAW PDF SUPPORT ---
+const listingCompositeStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (req, file) => {
+    
+    // Case A: Diamond Photos (Always Images)
+    if (file.fieldname === 'listingImages') {
+      return {
+        folder: 'diamond-connect/listing-images',
+        resource_type: 'image',
+        allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
+        transformation: [{ width: 800, height: 800, crop: 'limit' }]
+      };
+    }
+    
+    // Case B: Certificate (PDFs must be RAW)
+    if (file.fieldname === 'certificateFile') {
+      const isPdf = file.mimetype === 'application/pdf';
+      
+      if (isPdf) {
+          // 🛑 RAW MODE: This prevents corruption
+          return {
+            folder: 'diamond-connect/certificates',
+            resource_type: 'raw', 
+            use_filename: true, 
+            unique_filename: true
+          };
+      } else {
+          // If it's an image (JPG/PNG), treat it normally
+          return {
+            folder: 'diamond-connect/certificates',
+            resource_type: 'image',
+            allowed_formats: ['jpg', 'png', 'jpeg']
+          };
+      }
+    }
+  },
+});
+
+// --- 3. Filters & Instances ---
+
+// Filter for standard images
 const imageFileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith('image/')) {
     cb(null, true);
@@ -48,32 +107,36 @@ const imageFileFilter = (req, file, cb) => {
   }
 };
 
-// Create the multer upload instances
-const uploadProfilePhoto = multer({
-  storage: profilePhotoStorage,
-  fileFilter: imageFileFilter,
-  limits: { fileSize: 1024 * 1024 * 5 } // 5 MB limit
+const uploadProfilePhoto = multer({ 
+    storage: profilePhotoStorage, 
+    fileFilter: imageFileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 } 
 });
 
-const uploadListingImages = multer({
-  storage: listingImageStorage,
-  fileFilter: imageFileFilter,
-  limits: { fileSize: 1024 * 1024 * 5 } // 5 MB limit
+const uploadListingImages = multer({ 
+    storage: listingImageStorage, 
+    fileFilter: imageFileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 } 
 });
 
-// ## --- NEW: The uploader for chat documents --- ##
-const uploadDocument = multer({
-  storage: documentStorage,
-  limits: { fileSize: 1024 * 1024 * 10 } // 10 MB limit for any file
+// Chat Documents (PDFs allowed)
+const uploadDocument = multer({ 
+    storage: documentStorage, 
+    limits: { fileSize: 10 * 1024 * 1024 } 
+});
+
+// Updated Composite Uploader
+const uploadListingComposite = multer({
+  storage: listingCompositeStorage,
+  limits: { fileSize: 10 * 1024 * 1024 } 
 });
 
 module.exports = {
-  // For profile photos (field name 'profilePhoto')
   uploadProfilePhoto: uploadProfilePhoto.single('profilePhoto'),
-
-  // For listing images (field name 'listingImages')
   uploadListingImages: uploadListingImages.array('listingImages', 5),
-  
-  // ## --- NEW: Export the document uploader --- ##
-  uploadDocument: uploadDocument.single('document')
+  uploadDocument: uploadDocument.single('document'),
+  uploadListingWithCert: uploadListingComposite.fields([
+    { name: 'listingImages', maxCount: 5 }, 
+    { name: 'certificateFile', maxCount: 1 }
+  ])
 };

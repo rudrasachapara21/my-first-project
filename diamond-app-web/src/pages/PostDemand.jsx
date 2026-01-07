@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
-// ## CHANGE: Added PiCheckCircle icon ##
 import { PiPackage, PiUsers, PiCheckCircle } from "react-icons/pi";
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/axiosConfig';
@@ -10,53 +9,61 @@ import { SkeletonDemandCard } from '../components/SkeletonCard';
 import { useAuth } from '../context/AuthContext';
 
 const Container = styled.div`
-  background-color: ${props => props.theme.bgPrimary || '#FFFFFF'};
+  background-color: ${props => props.theme.bgPrimary || props.theme.textMain};
   min-height: 100%;
+  display: flex;
+  flex-direction: column;
 `;
 
+// ✅ FIX 1: Reduced Margins to pull content up
 const TabNav = styled.div`
   display: flex;
   background-color: ${props => props.theme.borderColor};
   border-radius: 12px;
-  padding: 5px;
-  margin: 1.5rem 1.5rem 2rem 1.5rem;
+  padding: 4px;
+  margin: 1rem 1rem 1.5rem 1rem; /* Tighter margins */
 `;
 
 const TabButton = styled.button`
   flex: 1;
-  padding: 0.75rem;
+  padding: 0.6rem; /* Smaller padding */
   border: none;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 500;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
   font-family: 'Clash Display', sans-serif;
-  color: ${props => props.$active ? '#FFFFFF' : props.theme.textSecondary};
+  color: ${props => props.$active ? props.theme.textMain : props.theme.textSecondary};
   background-color: ${props => props.$active ? props.theme.accentPrimary : 'transparent'};
 `;
 
 const TabContent = styled.div`
-  padding: 0 1.5rem;
+  padding: 0 1rem 2rem 1rem; /* Reduced side padding */
 `;
 
+// ✅ FIX 2: Tighter Grid Gap (0.8rem instead of 1.5rem)
 const FormGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.5rem;
+  gap: 0.8rem; 
   margin-bottom: 1.5rem;
 `;
 
 const FormField = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.3rem; /* Tighter gap between label and input */
   ${props => props.$fullWidth && `grid-column: 1 / -1;`}
 `;
 
 const Label = styled.label`
   font-weight: 500;
+  font-size: 0.9rem; /* Slightly smaller text */
   color: ${props => props.theme.textSecondary};
+  white-space: nowrap; /* Prevents wrapping */
+  overflow: hidden;
+  text-overflow: ellipsis;
   
   ${props => props.$required && `
     &::after {
@@ -66,21 +73,58 @@ const Label = styled.label`
   `}
 `;
 
-const InputField = styled.input` width: 100%; padding: 1rem; background-color: ${props => props.theme.bgSecondary}; border: 2px solid ${props => props.theme.borderColor}; border-radius: 12px; color: ${props => props.theme.textPrimary}; font-size: 1rem; box-sizing: border-box; &:focus { outline: none; border-color: ${props => props.theme.accentPrimary}; } `;
-const SelectField = styled.select` width: 100%; padding: 1rem; background-color: ${props => props.theme.bgSecondary}; border: 2px solid ${props => props.theme.borderColor}; border-radius: 12px; color: ${props => props.theme.textPrimary}; font-size: 1rem; box-sizing: border-box; &:focus { outline: none; border-color: ${props => props.theme.accentPrimary}; } `;
-const CtaButton = styled.button` width: 100%; padding: 1rem; border: none; border-radius: 12px; background: ${props => props.theme.accentPrimary}; color: #FFFFFF; font-family: 'Clash Display', sans-serif; font-size: 1.2rem; font-weight: 600; cursor: pointer; &:disabled { background-color: ${props => props.theme.borderColor}; color: ${props => props.theme.textSecondary}; cursor: not-allowed; } `;
+// ✅ FIX 3: Compact Inputs (Less padding, smaller height)
+const InputField = styled.input` 
+  width: 100%; 
+  padding: 0.75rem; /* Reduced from 1rem */
+  background-color: ${props => props.theme.bgSecondary}; 
+  border: 2px solid ${props => props.theme.borderColor}; 
+  border-radius: 10px; 
+  color: ${props => props.theme.textPrimary}; 
+  font-size: 0.95rem; 
+  box-sizing: border-box; 
+  &:focus { outline: none; border-color: ${props => props.theme.accentPrimary}; } 
+`;
+
+const DateInputField = styled(InputField)`
+  color-scheme: dark;
+  &::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.6;
+    cursor: pointer;
+  }
+`;
+
+const SelectField = styled.select` 
+  width: 100%; 
+  padding: 0.75rem; 
+  background-color: ${props => props.theme.bgSecondary}; 
+  border: 2px solid ${props => props.theme.borderColor}; 
+  border-radius: 10px; 
+  color: ${props => props.theme.textPrimary}; 
+  font-size: 0.95rem; 
+  box-sizing: border-box; 
+  &:focus { outline: none; border-color: ${props => props.theme.accentPrimary}; } 
+`;
+
+const CtaButton = styled.button` 
+  width: 100%; padding: 0.9rem; border: none; border-radius: 12px; 
+  background: ${props => props.theme.accentPrimary}; 
+  color: ${props => props.theme.textMain}; font-family: 'Clash Display', sans-serif; font-size: 1.1rem; font-weight: 600; 
+  cursor: pointer; 
+  margin-top: 0.5rem;
+  &:disabled { background-color: ${props => props.theme.borderColor}; color: ${props => props.theme.textSecondary}; cursor: not-allowed; } 
+`;
 
 const DemandCard = styled.div`
   background: ${props => props.theme.bgSecondary};
   border: 1px solid ${props => props.theme.borderColor};
   border-radius: 16px;
-  padding: 1.5rem;
-  margin-bottom: 1rem;
+  padding: 1.2rem;
+  margin-bottom: 0.8rem;
   cursor: pointer;
   transition: box-shadow 0.2s ease-in-out;
-  &:hover {
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-  }
+  &:hover { box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
 `;
 
 const CompletedDemandCard = styled(DemandCard)`
@@ -89,42 +133,10 @@ const CompletedDemandCard = styled(DemandCard)`
   cursor: default;
 `;
 
-const DemandTitle = styled.div`
-  font-size: 1.2rem;
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-`;
-
-const DemandFooter = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.9rem;
-  color: ${props => props.theme.textSecondary};
-  flex-wrap: nowrap;
-  gap: 1rem;
-`;
-
-const DemandInfo = styled.span`
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-`;
-
-const InterestIndicator = styled.div` 
-  display: flex; 
-  align-items: center; 
-  gap: 0.5rem; 
-  color: ${props => props.$hasInterest ? props.theme.accentPrimary : (props.$completed ? '#22c55e' : props.theme.textSecondary)}; 
-  font-weight: 600;
-  flex-shrink: 0;
-  
-  svg {
-    vertical-align: middle;
-  }
-`;
-
+const DemandTitle = styled.div` font-size: 1.1rem; font-weight: 500; margin-bottom: 0.4rem; `;
+const DemandFooter = styled.div` display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: ${props => props.theme.textSecondary}; flex-wrap: nowrap; gap: 1rem; `;
+const DemandInfo = styled.span` white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; `;
+const InterestIndicator = styled.div` display: flex; align-items: center; gap: 0.4rem; color: ${props => props.$hasInterest ? props.theme.accentPrimary : (props.$completed ? '#22c55e' : props.theme.textSecondary)}; font-weight: 600; flex-shrink: 0; svg { vertical-align: middle; } `;
 const Message = styled.p` text-align: center; font-weight: 500; margin-top: 1rem; color: ${props => props.success ? '#22c55e' : '#ef4444'}; `;
 const clarityOptions = ['IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'I1', 'I2', 'I3'];
 
@@ -212,7 +224,7 @@ function PostDemand() {
       return <><SkeletonDemandCard /><SkeletonDemandCard /></>;
     }
     if (activeDemands.length === 0) {
-      return <EmptyState icon={PiPackage} title="You Have No Active Demands" message="Use the 'Create Demand' tab to post a new requirement." />;
+      return <EmptyState icon={PiPackage} title="No Active Demands" message="Post a new requirement to get started." />;
     }
     return activeDemands.map(demand => {
       const d = demand.diamond_details || {};
@@ -239,7 +251,7 @@ function PostDemand() {
       return <><SkeletonDemandCard /><SkeletonDemandCard /></>;
     }
     if (completedDemands.length === 0) {
-      return <EmptyState icon={PiCheckCircle} title="No Completed Demands" message="Active deals you mark as 'complete' will appear here." />;
+      return <EmptyState icon={PiCheckCircle} title="No Completed Demands" message="Deals marked as 'complete' appear here." />;
     }
     return completedDemands.map(demand => {
       const d = demand.diamond_details || {};
@@ -260,7 +272,6 @@ function PostDemand() {
     });
   };
 
-
   return (
     <Container>
       <PageHeader title="My Demands" />
@@ -269,19 +280,18 @@ function PostDemand() {
         <TabButton $active={activeTab === 'activeDemands'} onClick={() => setActiveTab('activeDemands')}>
           Active ({activeDemands.length})
         </TabButton>
-        
-        {/* ## FIX: Corrected the closing tag from </AddingButton> to </TabButton> ## */}
         <TabButton $active={activeTab === 'completedDemands'} onClick={() => setActiveTab('completedDemands')}>
           Completed ({completedDemands.length})
         </TabButton>
-
       </TabNav>
+      
       <TabContent>
         {activeTab === 'create' && (
           <form onSubmit={handlePostDemand}>
             <FormGrid>
               <FormField>
-                <Label htmlFor="size" $required>Size (Carat)</Label>
+                {/* ✅ FIX: Shortened Label */}
+                <Label htmlFor="size" $required>Size (Ct)</Label>
                 <InputField id="size" name="size" type="number" step="0.01" placeholder="e.g., 1.5" value={formState.size} onChange={handleInputChange} required />
               </FormField>
               <FormField>
@@ -291,7 +301,8 @@ function PostDemand() {
                 </SelectField>
               </FormField>
               <FormField>
-                <Label htmlFor="price_per_caret" $required>Price per Carat (₹)</Label>
+                {/* ✅ FIX: Shortened Label */}
+                <Label htmlFor="price_per_caret" $required>Price/Ct (₹)</Label>
                 <InputField id="price_per_caret" name="price_per_caret" type="number" step="0.01" placeholder="e.g., 500000" value={formState.price_per_caret} onChange={handleInputChange} required />
               </FormField>
               <FormField>
@@ -299,16 +310,19 @@ function PostDemand() {
                 <InputField id="quantity" name="quantity" type="number" placeholder="e.g., 1" value={formState.quantity} onChange={handleInputChange} required />
               </FormField>
               <FormField>
+                {/* ✅ FIX: Shortened Label */}
                 <Label htmlFor="require_till">Required By</Label>
-                <InputField id="require_till" name="require_till" type="date" value={formState.require_till} onChange={handleInputChange} />
+                <DateInputField id="require_till" name="require_till" type="date" value={formState.require_till} onChange={handleInputChange} />
               </FormField>
               <FormField>
-                <Label htmlFor="payment_duration">Payment Duration</Label>
-                <InputField id="payment_duration" name="payment_duration" type="text" placeholder="e.g., Within 7 days" value={formState.payment_duration} onChange={handleInputChange} />
+                {/* ✅ FIX: Shortened Label to prevent wrapping */}
+                <Label htmlFor="payment_duration">Payment Terms</Label>
+                <InputField id="payment_duration" name="payment_duration" type="text" placeholder="e.g., 7 days" value={formState.payment_duration} onChange={handleInputChange} />
               </FormField>
               <FormField $fullWidth>
-                <Label htmlFor="private_name">Private Name (Only you can see this)</Label>
-                <InputField id="private_name" name="private_name" type="text" placeholder="e.g., 'Special request for John Doe'" value={formState.private_name} onChange={handleInputChange} />
+                {/* ✅ FIX: Shortened Label */}
+                <Label htmlFor="private_name">Private Note</Label>
+                <InputField id="private_name" name="private_name" type="text" placeholder="Only you can see this (e.g. Client Name)" value={formState.private_name} onChange={handleInputChange} />
               </FormField>
             </FormGrid>
 

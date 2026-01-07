@@ -2,16 +2,18 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import './index.css';
-import styled from 'styled-components'; // Import styled-components
+import styled from 'styled-components'; 
 
-import { ThemeProvider, useTheme } from './context/ThemeContext'; // Import useTheme
-import { AuthProvider, useAuth } from './context/AuthContext'; // Import useAuth
+import { ThemeProvider, useTheme } from './context/ThemeContext'; 
+import { AuthProvider, useAuth } from './context/AuthContext'; 
 import { WebSocketProvider } from './context/WebSocketContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { LoadingProvider } from './context/LoadingContext';
+
+import NotificationManager from './components/NotificationManager.jsx';
 
 import App from './App.jsx';
 import Login from './pages/Login.jsx';
-// ## CHANGE: Import the new RegisterPage ##
 import RegisterPage from './pages/RegisterPage.jsx'; 
 import TraderHome from './pages/TraderHome.jsx';
 import BrokerHome from './pages/BrokerHome.jsx';
@@ -29,6 +31,7 @@ import EditProfile from './pages/EditProfile.jsx';
 import AIPricing from './pages/AIPricing.jsx';
 import Help from './pages/Help.jsx';
 import News from './pages/News.jsx';
+import NewsDetailPage from './pages/NewsDetailPage.jsx'; 
 import Watchlist from './pages/Watchlist.jsx';
 import ChatListPage from './pages/ChatListPage.jsx';
 import ChatWindowPage from './pages/ChatWindowPage.jsx';
@@ -45,105 +48,105 @@ import AdminDashboard from './pages/admin/AdminDashboard.jsx';
 import ManageUsers from './pages/admin/ManageUsers.jsx';
 import ManageNews from './pages/admin/ManageNews.jsx';
 import AdminLogin from './pages/admin/AdminLogin.jsx';
-
-// ## --- NEW IMPORTS --- ##
 import AdminUserListPage from './pages/admin/AdminUserListPage.jsx';
-// (We will create this file in the next step)
 import AdminUserDetailPage from './pages/admin/AdminUserDetailPage.jsx';
+import VerifyEmail from './pages/VerifyEmail.jsx';
 
-
-// --- THIS IS THE FIX ---
-
-// 1. Create a simple loading screen that uses your theme
 const GlobalLoadingScreen = styled.div`
   height: 100vh;
   width: 100%;
-  /* This will use your theme's primary background color */
   background-color: ${props => props.theme.bgPrimary || '#0D1117'}; 
 `;
 
-// 2. Create a new component that holds all your routes
 const AppRoutes = () => {
-  // Now we can safely use the hooks because this component is
-  // *inside* the providers
-  const { isLoading } = useAuth();
-  const { theme } = useTheme();
-
-  // If the AuthContext is still loading, show a blank screen
-  if (isLoading) {
-    return <GlobalLoadingScreen theme={theme} />;
-  }
-
-  // Once loading is false, render the correct routes
   return (
-    <Routes>
-      <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-      {/* ## CHANGE: Add the new /register route ## */}
-      <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
-      <Route path="/admin/login" element={<PublicRoute><AdminLogin /></PublicRoute>} />
+    <>
+      <Routes>
+        {/* --- PUBLIC ROUTES --- */}
+        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+        <Route path="/admin/login" element={<PublicRoute><AdminLogin /></PublicRoute>} />
+        <Route path="/verify-email" element={<PublicRoute><VerifyEmail /></PublicRoute>} />
 
-      <Route path="/" element={<ProtectedRoute><App /></ProtectedRoute>}>
-        {/* All your app routes from your original file */}
-        <Route index element={<BrokerHome />} />
-        <Route path="trader-home" element={<TraderHome />} />
-        <Route path="broker-home" element={<BrokerHome />} />
-        <Route path="my-demands" element={<PostDemand />} />
-        <Route path="demand/:demandId" element={<DemandDetailPage />} />
-        <Route path="view-demands" element={<ViewDemands />} />
-        <Route path="buy-feed" element={<BuyFeed />} />
-        <Route path="listing/:listingId" element={<ListingDetailsPage />} />
-        <Route path="listing/:listingId/offers" element={<ListingOffersPage />} />
-        <Route path="listing/edit/:listingId" element={<EditListingPage />} />
-        <Route path="sell-diamonds" element={<SellDiamonds />} />
-        <Route path="settings" element={<Settings />} />
-        <Route path="notifications" element={<Notifications />} />
-        <Route path="app-theme" element={<AppTheme />} />
-        <Route path="edit-profile" element={<EditProfile />} />
-        <Route path="profile/:userId" element={<BrokerProfilePage />} />
-        <Route path="ai-pricing" element={<AIPricing />} />
-        <Route path="help" element={<Help />} />
-        <Route path="news" element={<News />} />
-        <Route path="watchlist" element={<Watchlist />} />
-        <Route path="chats" element={<ChatListPage />} />
-        <Route path="chat/:conversationId" element={<ChatWindowPage />} />
-        <Route path="security" element={<Security />} />
-        <Route path="offers" element={<OffersPage />} />
-        <Route path="workspace" element={<Workspace />} />
-        <Route path="broker/demand/:demandId" element={<BrokerDemandView />} />
-      </Route>
-      
-      <Route path="/admin" element={<ProtectedRoute adminOnly={true}><AdminLayout /></ProtectedRoute>}>
-        {/* All your admin routes from your original file */}
-        <Route index element={<AdminDashboard />} />
-        <Route path="users" element={<ManageUsers />} />
-        <Route path="news" element={<ManageNews />} />
+        {/* --- PROTECTED USER ROUTES --- */}
+        <Route path="/" element={<ProtectedRoute><App /></ProtectedRoute>}>
+          <Route index element={<BrokerHome />} />
+          <Route path="trader-home" element={<TraderHome />} />
+          <Route path="broker-home" element={<BrokerHome />} />
+          <Route path="my-demands" element={<PostDemand />} />
+          <Route path="demand/:demandId" element={<DemandDetailPage />} />
+          <Route path="view-demands" element={<ViewDemands />} />
+          <Route path="buy-feed" element={<BuyFeed />} />
+          <Route path="listing/:listingId" element={<ListingDetailsPage />} />
+          <Route path="listing/:listingId/offers" element={<ListingOffersPage />} />
+          <Route path="listing/edit/:listingId" element={<EditListingPage />} />
+          <Route path="sell-diamonds" element={<SellDiamonds />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="notifications" element={<Notifications />} />
+          <Route path="app-theme" element={<AppTheme />} />
+          <Route path="edit-profile" element={<EditProfile />} />
+          
+          {/* ✅ FIXED: Added both profile route aliases to prevent 404s */}
+          <Route path="profile/:userId" element={<BrokerProfilePage />} />
+          <Route path="broker-profile/:userId" element={<BrokerProfilePage />} />
+
+          <Route path="ai-pricing" element={<AIPricing />} />
+          <Route path="help" element={<Help />} />
+          <Route path="news" element={<News />} />
+          <Route path="news/:id" element={<NewsDetailPage />} />
+          <Route path="watchlist" element={<Watchlist />} />
+          <Route path="chats" element={<ChatListPage />} />
+          <Route path="chat/:conversationId" element={<ChatWindowPage />} />
+          <Route path="security" element={<Security />} />
+          <Route path="offers" element={<OffersPage />} />
+          <Route path="workspace" element={<Workspace />} />
+          <Route path="broker/demand/:demandId" element={<BrokerDemandView />} />
+        </Route>
         
-        {/* ## --- NEW ROUTES ADDED --- ## */}
-        {/* This is the new list/search page */}
-        <Route path="user-monitoring" element={<AdminUserListPage />} />
-        {/* This is the new detail/tabs page */}
-        <Route path="user-monitoring/:userId" element={<AdminUserDetailPage />} />
-
-      </Route>
-    </Routes>
+        {/* --- ADMIN ROUTES --- */}
+        <Route path="/admin" element={<ProtectedRoute adminOnly={true}><AdminLayout /></ProtectedRoute>}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="users" element={<ManageUsers />} />
+          <Route path="news" element={<ManageNews />} />
+          <Route path="user-monitoring" element={<AdminUserListPage />} />
+          <Route path="user-monitoring/:userId" element={<AdminUserDetailPage />} />
+        </Route>
+      </Routes>
+    </>
   );
 };
 
-// 3. Update your main render function to use the providers
-//    and then render the new <AppRoutes /> component
+// AppContent lives inside ThemeProvider so it can safely consume the theme hook
+const AppContent = () => {
+  const { isLoading } = useAuth();
+  const { currentTheme } = useTheme();
+
+  if (isLoading) {
+    return <GlobalLoadingScreen theme={currentTheme} />;
+  }
+
+  return (
+    <>
+      <NotificationManager />
+      <AppRoutes />
+    </>
+  );
+};
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <HashRouter>
-      <ThemeProvider>
-        <AuthProvider>
+      <AuthProvider>      
+        <ThemeProvider>    
           <WebSocketProvider>
             <NotificationProvider>
-              {/* This one component now handles the loading logic */}
-              <AppRoutes />
+              <LoadingProvider>
+                <AppContent />
+              </LoadingProvider>
             </NotificationProvider>
           </WebSocketProvider>
-        </AuthProvider>
-      </ThemeProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </HashRouter>
   </React.StrictMode>
 );

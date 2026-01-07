@@ -1,4 +1,5 @@
 const db = require('../db');
+const { sendApprovalEmail, sendRejectionEmail } = require('../services/emailService');
 
 /**
  * @desc    Get all users for the admin search list
@@ -13,7 +14,9 @@ exports.adminGetAllUsers = async (req, res, next) => {
                 full_name, 
                 office_name, 
                 profile_photo_url,
-                role
+                role,
+                is_verified,
+                is_suspended
             FROM users 
             WHERE role != 'admin' 
             ORDER BY full_name ASC
@@ -33,14 +36,13 @@ exports.adminGetAllUsers = async (req, res, next) => {
 exports.adminGetUserProfile = async (req, res, next) => {
     const { userId } = req.params;
     try {
-        // 1. Get User Profile
         const userQuery = `
             SELECT 
                 user_id, full_name, email, phone_number, office_name, role, is_verified,
                 gst_number, office_address, reputation_points, created_at,
-                is_suspended, -- <-- ADDED THIS
-                (SELECT COUNT(*) FROM demands WHERE trader_id = $1) as total_demands,
-                (SELECT COUNT(*) FROM listings WHERE trader_id = $1) as total_listings
+                is_suspended, 
+                (SELECT COUNT(*) FROM demands WHERE user_id = $1) as total_demands,
+                (SELECT COUNT(*) FROM listings WHERE user_id = $1) as total_listings
             FROM users
             WHERE user_id = $1
         `;
@@ -50,7 +52,6 @@ exports.adminGetUserProfile = async (req, res, next) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // 2. Get User Stats (Reviews)
         const statsQuery = `
             SELECT 
                 COALESCE(AVG(rating), 0) AS average_rating, 
@@ -74,7 +75,6 @@ exports.adminGetUserProfile = async (req, res, next) => {
     }
 };
 
-
 /**
  * @desc    Get all activity for a specific user (for tabs)
  * @route   GET /api/admin/users/:userId/activity
@@ -83,27 +83,28 @@ exports.adminGetUserProfile = async (req, res, next) => {
 exports.adminGetUserActivity = async (req, res, next) => {
     const { userId } = req.params;
     try {
-        // 1. Demands (Live & Completed)
+        // 1. Demands
         const demandsQuery = `
-            SELECT demand_id, diamond_details, status, created_at 
+            SELECT demand_id, shape, min_carat, max_carat, color, clarity, status, created_at 
             FROM demands 
-            WHERE trader_id = $1
+            WHERE user_id = $1
             ORDER BY created_at DESC
         `;
         const demandsPromise = db.query(demandsQuery, [userId]);
 
-        // 2. Listings (Available & Sold)
+        // 2. Listings
         const listingsQuery = `
-            SELECT listing_id, diamond_details, price, status, created_at
+            SELECT listing_id, shape, carat, color, clarity, price, status, created_at
             FROM listings
-            WHERE trader_id = $1
+            WHERE user_id = $1
             ORDER BY created_at DESC
         `;
         const listingsPromise = db.query(listingsQuery, [userId]);
 
-        // 3. Offers Made (by this user)
+        // 3. Offers Made
         const offersMadeQuery = `
-            SELECT o.offer_id, o.offer_price, o.status, o.created_at, l.diamond_details
+            SELECT o.offer_id, o.offer_price, o.status, o.created_at, 
+                   l.shape, l.carat, l.color, l.clarity
             FROM offers o
             JOIN listings l ON o.listing_id = l.listing_id
             WHERE o.buyer_id = $1
@@ -111,9 +112,11 @@ exports.adminGetUserActivity = async (req, res, next) => {
         `;
         const offersMadePromise = db.query(offersMadeQuery, [userId]);
 
-        // 4. Offers Received (on this user's listings)
+        // 4. Offers Received
         const offersReceivedQuery = `
-            SELECT o.offer_id, o.offer_price, o.status, o.created_at, l.diamond_details, u.full_name as buyer_name
+            SELECT o.offer_id, o.offer_price, o.status, o.created_at, 
+                   l.shape, l.carat, l.color, l.clarity, 
+                   u.full_name as buyer_name
             FROM offers o
             JOIN listings l ON o.listing_id = l.listing_id
             JOIN users u ON o.buyer_id = u.user_id
@@ -122,7 +125,7 @@ exports.adminGetUserActivity = async (req, res, next) => {
         `;
         const offersReceivedPromise = db.query(offersReceivedQuery, [userId]);
 
-        // 5. Reviews Given (by this user)
+        // 5. Reviews Given
         const reviewsGivenQuery = `
             SELECT r.*, u.full_name as reviewee_name
             FROM reviews r
@@ -132,7 +135,7 @@ exports.adminGetUserActivity = async (req, res, next) => {
         `;
         const reviewsGivenPromise = db.query(reviewsGivenQuery, [userId]);
 
-        // 6. Reviews Received (by this user)
+        // 6. Reviews Received
         const reviewsReceivedQuery = `
             SELECT r.*, u.full_name as reviewer_name
             FROM reviews r
@@ -142,7 +145,6 @@ exports.adminGetUserActivity = async (req, res, next) => {
         `;
         const reviewsReceivedPromise = db.query(reviewsReceivedQuery, [userId]);
 
-        // Run all queries in parallel
         const [
             demandsResult,
             listingsResult,
@@ -159,14 +161,28 @@ exports.adminGetUserActivity = async (req, res, next) => {
             reviewsReceivedPromise
         ]);
 
-        // Send the neatly packaged data
+        const formatDiamondString = (item) => {
+            if (item.shape && item.carat) {
+                return `${item.carat}ct ${item.shape} ${item.color || ''} ${item.clarity || ''}`;
+            }
+            if (item.min_carat) {
+                return `${item.min_carat}-${item.max_carat}ct ${item.shape}`;
+            }
+            return 'Diamond Details';
+        };
+
+        const formatList = (list) => list.map(item => ({
+            ...item,
+            diamond_details: formatDiamondString(item)
+        }));
+
         res.status(200).json({
-            liveDemands: demandsResult.rows.filter(d => d.status === 'active'),
-            completedDemands: demandsResult.rows.filter(d => d.status === 'completed'),
-            currentListings: listingsResult.rows.filter(l => l.status === 'available'),
-            soldListings: listingsResult.rows.filter(l => l.status === 'sold'),
-            offersMade: offersMadeResult.rows,
-            offersReceived: offersReceivedResult.rows,
+            liveDemands: formatList(demandsResult.rows.filter(d => d.status === 'active')),
+            completedDemands: formatList(demandsResult.rows.filter(d => d.status === 'completed')),
+            currentListings: formatList(listingsResult.rows.filter(l => l.status === 'active' || l.status === 'available')),
+            soldListings: formatList(listingsResult.rows.filter(l => l.status === 'sold')),
+            offersMade: formatList(offersMadeResult.rows),
+            offersReceived: formatList(offersReceivedResult.rows),
             reviewsGiven: reviewsGivenResult.rows,
             reviewsReceived: reviewsReceivedResult.rows
         });
@@ -176,7 +192,6 @@ exports.adminGetUserActivity = async (req, res, next) => {
     }
 };
 
-// ## --- NEW FUNCTION --- ##
 /**
  * @desc    Toggle a user's suspension status
  * @route   PUT /api/admin/users/:userId/suspend
@@ -184,7 +199,7 @@ exports.adminGetUserActivity = async (req, res, next) => {
  */
 exports.adminToggleSuspendUser = async (req, res, next) => {
     const { userId } = req.params;
-    const { suspend } = req.body; // Expecting { "suspend": true } or { "suspend": false }
+    const { suspend } = req.body; 
 
     if (typeof suspend !== 'boolean') {
         return res.status(400).json({ message: 'Invalid suspension status. Must be a boolean.' });
@@ -204,7 +219,7 @@ exports.adminToggleSuspendUser = async (req, res, next) => {
         }
 
         const action = suspend ? 'suspended' : 'un-suspended';
-        // Invalidate this user's socket connection to force a re-login
+        
         if (req.io && suspend) {
              req.io.to(userId.toString()).emit('force_logout', { message: 'Your account has been suspended.' });
         }
@@ -214,6 +229,133 @@ exports.adminToggleSuspendUser = async (req, res, next) => {
             is_suspended: rows[0].is_suspended
         });
 
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * @desc    List users awaiting admin approval (email verified but not approved)
+ * @route   GET /api/admin/pending-users
+ * @access  Admin
+ */
+exports.adminGetPendingUsers = async (req, res, next) => {
+    try {
+        const q = `
+            SELECT user_id, full_name, email, role, created_at
+            FROM users
+            WHERE email_verified = TRUE AND is_verified = FALSE AND role != 'admin'
+            ORDER BY created_at ASC
+        `;
+        const { rows } = await db.query(q);
+        res.status(200).json(rows);
+    } catch (err) {
+        next(err);
+    }
+};
+
+/**
+ * @desc    Approve a user and send welcome email
+ * @route   POST /api/admin/approve-user
+ * @access  Admin
+ */
+exports.adminApproveUser = async (req, res, next) => {
+    try {
+        const { userId } = req.body;
+        if (!userId) return res.status(400).json({ message: 'userId is required' });
+
+        const upd = `UPDATE users SET is_verified = TRUE WHERE user_id = $1 AND role != 'admin' RETURNING user_id, full_name, email`;
+        const { rows } = await db.query(upd, [userId]);
+        if (rows.length === 0) return res.status(404).json({ message: 'User not found or invalid action' });
+
+        const user = rows[0];
+        
+        // Attempt to send the approval email
+        try {
+            await sendApprovalEmail({ to: user.email, name: user.full_name });
+            console.log(`[Admin] Approval email sent to ${user.email}`);
+        } catch (e) {
+            console.error(`[Admin] Failed to send approval email to ${user.email}:`, e.message);
+        }
+
+        return res.status(200).json({ message: `Approved ${user.full_name}`, userId: user.user_id });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/**
+ * @desc    Reject a user and send rejection email
+ * @route   POST /api/admin/reject-user
+ * @access  Admin
+ */
+exports.adminRejectUser = async (req, res, next) => {
+    try {
+        const { userId } = req.body;
+        if (!userId) return res.status(400).json({ message: 'userId is required' });
+
+        // Get user details before deletion for the email
+        const getUser = `SELECT user_id, full_name, email FROM users WHERE user_id = $1 AND role != 'admin'`;
+        const { rows } = await db.query(getUser, [userId]);
+        if (rows.length === 0) return res.status(404).json({ message: 'User not found or invalid action' });
+
+        const user = rows[0];
+
+        // Delete the user from database
+        const delQuery = `DELETE FROM users WHERE user_id = $1`;
+        await db.query(delQuery, [userId]);
+
+        // Attempt to send the rejection email
+        try {
+            await sendRejectionEmail({ to: user.email, name: user.full_name });
+            console.log(`[Admin] Rejection email sent to ${user.email}`);
+        } catch (e) {
+            console.error(`[Admin] Failed to send rejection email to ${user.email}:`, e.message);
+        }
+
+        return res.status(200).json({ message: `Rejected and removed ${user.full_name}`, userId: user.user_id });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/**
+ * ✅ NEW FUNCTION: Un-verify a user
+ * @desc    Un-verify a user (moves them back to pending list)
+ * @route   POST /api/admin/unverify-user
+ * @access  Admin
+ */
+exports.unverifyUser = async (req, res, next) => {
+    try {
+        const { userId } = req.body;
+        if (!userId) {
+            return res.status(400).json({ message: 'userId is required' });
+        }
+
+        const query = `
+            UPDATE users 
+            SET is_verified = FALSE 
+            WHERE user_id = $1 AND role != 'admin' 
+            RETURNING user_id, full_name, email;
+        `;
+        
+        const { rows } = await db.query(query, [userId]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'User not found or user is an admin.' });
+        }
+
+        // Force logout the user if they are currently online via Socket.io
+        if (req.io) {
+            req.io.to(userId.toString()).emit('force_logout', { 
+                message: 'Your verification has been revoked by an administrator.' 
+            });
+        }
+
+        res.status(200).json({ 
+            message: `User '${rows[0].full_name}' has been un-verified and moved to the pending list.`,
+            userId: rows[0].user_id 
+        });
     } catch (error) {
         next(error);
     }
