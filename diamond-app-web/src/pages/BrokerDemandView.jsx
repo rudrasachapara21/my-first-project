@@ -5,6 +5,7 @@ import apiClient from '../api/axiosConfig';
 import PageHeader from '../components/PageHeader';
 import { PiChatCircleDots, PiHand, PiCheckCircle, PiXCircle, PiClock } from 'react-icons/pi';
 import { useAuth } from '../context/AuthContext';
+import Toast from '../components/Toast';
 
 // --- Styles ---
 const Container = styled.div`
@@ -174,9 +175,9 @@ function BrokerDemandView() {
     try {
       await apiClient.post(`/api/demands/${demandId}/raise-hand`);
       setIsInterested(true);
-      alert("Success! Hand raised. The seller has been notified.");
+      triggerToast("Success! Hand raised. The seller has been notified.", 'success');
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to raise hand.");
+      triggerToast(err.response?.data?.message || "Failed to raise hand.", 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -187,14 +188,14 @@ function BrokerDemandView() {
     setIsProcessing(true);
     try {
       const response = await apiClient.post(`/api/demands/${demandId}/request-details`);
-      alert(response.data.message || "Details have been sent to your chat.");
+      triggerToast(response.data.message || "Details have been sent to your chat.", 'success');
       
       // FIX: Changed from '/messages' to '/chats'
       navigate('/chats'); 
     } catch (err) {
       // FIX: Using 'err' correctly
       console.error(err);
-      alert(err.response?.data?.message || "Failed to request details."); 
+      triggerToast(err.response?.data?.message || "Failed to request details.", 'error'); 
     } finally {
       setIsProcessing(false);
     }
@@ -205,11 +206,11 @@ function BrokerDemandView() {
       const response = await apiClient.post(`/api/conversations`, { recipientId: traderId });
       navigate(`/chat/${response.data.conversation_id}`, { state: { partnerName: traderName } });
     } catch (error) {
-      alert(error.response?.data?.message || "Could not start conversation.");
+      triggerToast(error.response?.data?.message || "Could not start conversation.", 'error');
     }
   };
 
-  if (isLoading) return <p>Loading demand...</p>;
+  if (isLoading) return <p style={{ padding: '2rem', color: 'var(--text-primary)' }}>Loading demand...</p>;
   if (error) return <p>{error}</p>;
   if (!demand) return <p>Demand not found.</p>;
 
@@ -222,6 +223,7 @@ function BrokerDemandView() {
   
   return (
     <Container>
+      <Toast show={toast.show} message={toast.message} type={toast.type} />
       <PageHeader title="Demand Details" backTo={-1} />
       <Content>
         <DemandCard>

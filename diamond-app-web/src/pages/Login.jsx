@@ -55,36 +55,129 @@ const Tagline = styled.p`
 `;
 
 const FormCard = styled.div`
-    background-color: ${props => props.theme.bgSecondary}; border-radius: 32px;
-    padding: 3.5rem 3rem; box-shadow: 0 25px 60px rgba(0,0,0,0.12); text-align: left;
-    border: 1px solid ${props => props.theme.borderColor};
+    background: ${props => props.theme.surfaceGlass || `${props.theme.bgSecondary}dd`};
+    backdrop-filter: blur(20px) saturate(120%);
+    border-radius: 32px;
+    padding: 3.5rem 3rem;
+    box-shadow: ${props => props.theme.cardShadow || '0 25px 60px rgba(0,0,0,0.12)'};
+    text-align: left;
+    border: ${props => props.theme.glassBorder || `1px solid ${props.theme.borderColor}`};
+    position: relative;
+    overflow: hidden;
+    
+    &::before {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        background: linear-gradient(135deg, ${props => props.theme.accentPrimary}40, transparent 40%, transparent 60%, ${props => props.theme.accentSecondary || props.theme.accentPrimary}40);
+        border-radius: 32px;
+        z-index: -1;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    &:hover::before {
+        opacity: 1;
+    }
 `;
 
 const RoleToggle = styled.div`
-    display: flex; background-color: ${props => props.theme.bgPrimary};
-    border-radius: 16px; padding: 6px; margin-bottom: 2.5rem;
+    display: flex;
+    background-color: ${props => props.theme.bgPrimary};
+    border-radius: 16px;
+    padding: 6px;
+    margin-bottom: 2.5rem;
     border: 1px solid ${props => props.theme.borderColor};
-    /* UNIFIED SHADOW: matching input fields */
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); 
 `;
 
 const ToggleButton = styled.button`
-    flex: 1; padding: 0.9rem; border: none; font-size: 0.95rem; font-weight: 600;
-    border-radius: 12px; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    flex: 1;
+    padding: 1rem 0.9rem;
+    border: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     font-family: 'Clash Display', sans-serif;
     color: ${props => props.$active ? props.theme.textMain : props.theme.textSecondary};
     background-color: ${props => props.$active ? props.theme.accentPrimary : 'transparent'};
-    &:hover { color: ${props => !props.$active && props.theme.textPrimary}; }
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    
+    &:hover {
+        color: ${props => !props.$active && props.theme.textPrimary};
+        transform: ${props => !props.$active && 'translateY(-2px)'};
+    }
+`;
+
+const RoleIcon = styled.div`
+    font-size: 1.5rem;
+    line-height: 1;
+`;
+
+const RoleDescription = styled.div`
+    font-size: 0.7rem;
+    font-weight: 400;
+    opacity: 0.8;
+    font-family: 'Inter', sans-serif;
+`;
+
+const InputWrapper = styled.div`
+    position: relative;
+    margin-bottom: 1.5rem;
+`;
+
+const InputIcon = styled.div`
+    position: absolute;
+    left: 1.2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: ${props => props.$focused ? props.theme.accentPrimary : props.theme.textSecondary};
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    z-index: 1;
 `;
 
 const InputField = styled.input`
-    width: 100%; padding: 1.2rem; background-color: ${props => props.theme.bgPrimary};
-    border: 2px solid ${props => props.theme.borderColor}; border-radius: 16px;
+    width: 100%; padding: 1.2rem 3rem 1.2rem 3.5rem;
+    background-color: ${props => props.theme.bgPrimary};
+    border: 2px solid ${props => props.$focused ? props.theme.accentPrimary : props.$error ? props.theme.error || '#ef4444' : props.theme.borderColor};
+    border-radius: 16px;
     color: ${props => props.theme.textPrimary}; font-size: 1rem;
-    box-sizing: border-box; margin-bottom: 1.5rem;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    &:focus { outline: none; border-color: ${props => props.theme.accentPrimary}; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); }
+    box-sizing: border-box;
+    transition: all 0.3s ease;
+    box-shadow: ${props => props.$focused ? `0 0 0 4px ${props.theme.accentPrimary}20, 0 0 20px ${props.theme.accentPrimary}15` : '0 2px 4px rgba(0, 0, 0, 0.05)'};
+    &:focus { outline: none; }
+    &::placeholder { color: ${props => props.theme.textSecondary}; opacity: 0.6; }
+`;
+
+const PasswordToggle = styled.button`
+    position: absolute;
+    right: 1.2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: ${props => props.theme.textSecondary};
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0.5rem;
+    transition: color 0.2s ease;
+    z-index: 1;
+    &:hover { color: ${props => props.theme.accentPrimary}; }
+`;
+
+const ValidationMessage = styled.p`
+    color: ${props => props.theme.error || '#ef4444'};
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+    margin-left: 0.5rem;
+    margin-bottom: 0;
 `;
 
 const Spinner = styled.div`
@@ -148,19 +241,53 @@ function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [emailFocused, setEmailFocused] = useState(false);
+    const [passwordFocused, setPasswordFocused] = useState(false);
+    const [emailError, setEmailError] = useState('');
     const { login } = useAuth();
 
     const navigate = useNavigate();
+
+    const validateEmail = (value) => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!value) {
+            setEmailError('');
+            return false;
+        }
+        if (!emailRegex.test(value)) {
+            setEmailError('Please enter a valid email address');
+            return false;
+        }
+        setEmailError('');
+        return true;
+    };
 
     const handleLogin = async (e) => {
         e.preventDefault();
         setIsLoading(true);
         setError('');
-        const result = await login(email, password, activeRole);
-        if (!result.success) {
-            setError(result.message);
+        
+        try {
+            const result = await login(email, password, activeRole);
+            
+            if (result && result.success) {
+                // ✅ BUG FIX: Explicitly navigate to the correct home route after success
+                if (activeRole === 'trader') {
+                    navigate('/trader-home');
+                } else if (activeRole === 'broker') {
+                    navigate('/broker-home');
+                } else {
+                    navigate('/');
+                }
+            } else {
+                setError(result?.message || 'Login failed.');
+            }
+        } catch (err) {
+            setError('An error occurred. Please try again.');
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
     if (!currentTheme) return null;
@@ -178,25 +305,58 @@ function Login() {
                     <Tagline>Premier B2B Diamond Exchange</Tagline>
                     <FormCard>
                         <RoleToggle>
-                            <ToggleButton $active={activeRole === 'trader'} onClick={() => setActiveRole('trader')}>Trader</ToggleButton>
-                            <ToggleButton $active={activeRole === 'broker'} onClick={() => setActiveRole('broker')}>Broker</ToggleButton>
+                            <ToggleButton $active={activeRole === 'trader'} onClick={() => setActiveRole('trader')}>
+                                <RoleIcon>💎</RoleIcon>
+                                Trader
+                                <RoleDescription>Buy & Sell Diamonds</RoleDescription>
+                            </ToggleButton>
+                            <ToggleButton $active={activeRole === 'broker'} onClick={() => setActiveRole('broker')}>
+                                <RoleIcon>🤝</RoleIcon>
+                                Broker
+                                <RoleDescription>Facilitate Deals</RoleDescription>
+                            </ToggleButton>
                         </RoleToggle>
                         
                         <form onSubmit={handleLogin}>
-                            <InputField 
-                                type="email" 
-                                placeholder="Email Address" 
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                            />
-                            <InputField 
-                                type="password" 
-                                placeholder="Password" 
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                            />
+                            <InputWrapper>
+                                <InputIcon $focused={emailFocused}>📧</InputIcon>
+                                <InputField
+                                    type="email"
+                                    placeholder="Email Address"
+                                    value={email}
+                                    onChange={(e) => {
+                                        setEmail(e.target.value);
+                                        validateEmail(e.target.value);
+                                    }}
+                                    onFocus={() => setEmailFocused(true)}
+                                    onBlur={() => setEmailFocused(false)}
+                                    $focused={emailFocused}
+                                    $error={emailError}
+                                    required
+                                />
+                                {emailError && <ValidationMessage>{emailError}</ValidationMessage>}
+                            </InputWrapper>
+                            
+                            <InputWrapper>
+                                <InputIcon $focused={passwordFocused}>🔒</InputIcon>
+                                <InputField
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="Password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    onFocus={() => setPasswordFocused(true)}
+                                    onBlur={() => setPasswordFocused(false)}
+                                    $focused={passwordFocused}
+                                    required
+                                />
+                                <PasswordToggle
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    aria-label="Toggle password visibility"
+                                >
+                                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                                </PasswordToggle>
+                            </InputWrapper>
                             
                             <CtaButton type="submit" disabled={isLoading}>
                                 {isLoading ? (

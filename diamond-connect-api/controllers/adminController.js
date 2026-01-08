@@ -1,5 +1,5 @@
 const db = require('../db');
-const { sendApprovalEmail, sendRejectionEmail } = require('../services/emailService');
+const { sendApprovalEmail, sendRejectionEmail, sendSuspensionEmail, sendWarningEmail } = require('../services/emailService');
 
 /**
  * @desc    Get all users for the admin search list
@@ -199,7 +199,7 @@ exports.adminGetUserActivity = async (req, res, next) => {
  */
 exports.adminToggleSuspendUser = async (req, res, next) => {
     const { userId } = req.params;
-    const { suspend } = req.body; 
+    const { suspend, reason } = req.body; 
 
     if (typeof suspend !== 'boolean') {
         return res.status(400).json({ message: 'Invalid suspension status. Must be a boolean.' });
@@ -210,7 +210,7 @@ exports.adminToggleSuspendUser = async (req, res, next) => {
             UPDATE users
             SET is_suspended = $1
             WHERE user_id = $2 AND role != 'admin'
-            RETURNING user_id, full_name, is_suspended;
+            RETURNING user_id, full_name, email, is_suspended;
         `;
         const { rows } = await db.query(query, [suspend, userId]);
 
@@ -219,14 +219,30 @@ exports.adminToggleSuspendUser = async (req, res, next) => {
         }
 
         const action = suspend ? 'suspended' : 'un-suspended';
+        const user = rows[0];
         
-        if (req.io && suspend) {
-             req.io.to(userId.toString()).emit('force_logout', { message: 'Your account has been suspended.' });
+        // Send suspension email
+        if (suspend) {
+            try {
+                await sendSuspensionEmail({ 
+                    to: user.email, 
+                    name: user.full_name, 
+                    reason: reason || 'Violation of community guidelines' 
+                });
+                console.log(`[Admin] Suspension email sent to ${user.email}`);
+            } catch (e) {
+                console.error(`[Admin] Failed to send suspension email to ${user.email}:`, e.message);
+            }
+            
+            // Force logout via Socket.io
+            if (req.io) {
+                req.io.to(userId.toString()).emit('force_logout', { message: 'Your account has been suspended.' });
+            }
         }
 
         res.status(200).json({
-            message: `User '${rows[0].full_name}' has been ${action}.`,
-            is_suspended: rows[0].is_suspended
+            message: `User '${user.full_name}' has been ${action}.`,
+            is_suspended: user.is_suspended
         });
 
     } catch (error) {
@@ -355,6 +371,75 @@ exports.unverifyUser = async (req, res, next) => {
         res.status(200).json({ 
             message: `User '${rows[0].full_name}' has been un-verified and moved to the pending list.`,
             userId: rows[0].user_id 
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * ✅ NEW: Send warning to user
+ * @desc    Send official warning email to user for misconduct
+ * @route   POST /api/admin/users/:userId/warn
+ * @access  Admin
+ */
+exports.adminWarnUser = async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+        const { warning } = req.body;
+
+        if (!warning || warning.trim().length === 0) {
+            return res.status(400).json({ message: 'Warning message is required' });
+        }
+
+        // Get user details
+        const userQuery = `SELECT user_id, full_name, email FROM users WHERE user_id = $1 AND role != 'admin'`;
+        const { rows } = await db.query(userQuery, [userId]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'User not found or user is an admin.' });
+        }
+
+        const user = rows[0];
+        const adminName = req.user?.full_name || 'Admin Team';
+
+        // Store warning in database (optional - create warnings table if needed)
+        try {
+            const insertWarning = `
+                INSERT INTO user_warnings (user_id, warning_text, warned_by, created_at)
+                VALUES ($1, $2, $3, NOW())
+            `;
+            await db.query(insertWarning, [userId, warning, req.user?.user_id || null]);
+        } catch (dbErr) {
+            // If warnings table doesn't exist, just log and continue with email
+            console.warn('[Admin] Warning table not found, skipping database insert:', dbErr.message);
+        }
+
+        // Send warning email
+        try {
+            await sendWarningEmail({ 
+                to: user.email, 
+                name: user.full_name, 
+                warning: warning,
+                warnedBy: adminName
+            });
+            console.log(`[Admin] Warning email sent to ${user.email}`);
+        } catch (e) {
+            console.error(`[Admin] Failed to send warning email to ${user.email}:`, e.message);
+            return res.status(500).json({ message: 'Failed to send warning email' });
+        }
+
+        // Send real-time notification via Socket.io
+        if (req.io) {
+            req.io.to(userId.toString()).emit('admin_warning', { 
+                message: warning,
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        res.status(200).json({ 
+            message: `Warning sent to ${user.full_name}`,
+            userId: user.user_id 
         });
     } catch (error) {
         next(error);

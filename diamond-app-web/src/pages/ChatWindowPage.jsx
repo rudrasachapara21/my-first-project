@@ -8,7 +8,7 @@ import {
 } from "react-icons/pi";
 import { useWebSocket } from '../context/WebSocketContext';
 import { useAuth } from '../context/AuthContext';
-import toast, { Toaster } from 'react-hot-toast';
+import Toast from '../components/Toast';
 
 // --- ANIMATIONS ---
 const fadeIn = keyframes`
@@ -349,9 +349,9 @@ function ChatWindowPage() {
                 conversation_id: conversationId,
                 reason: 'Reported from chat window'
             });
-            toast.success('Report submitted successfully.');
+            triggerToast('Report submitted successfully.', 'success');
         } catch (error) {
-            toast.error('Failed to submit report.');
+            triggerToast('Failed to submit report.', 'error');
         }
     }
   };
@@ -361,15 +361,15 @@ function ChatWindowPage() {
     if (partnerId) {
         navigate(`/broker-profile/${partnerId}`); 
     } else {
-        toast.error("User profile not available.");
+        triggerToast("User profile not available.", 'error');
     }
   };
 
-  if (!user) return <p style={{padding:'20px'}}>Loading...</p>;
+  if (!user) return <p style={{padding:'20px', color: 'var(--text-primary)'}}>Loading...</p>;
 
   return (
     <PageWrapper>
-      <Toaster position="top-center" />
+      <Toast show={toast.show} message={toast.message} type={toast.type} />
       <HeaderContainer>
         {/* ✅ FIX: Title is now wrapped in a Clickable area */}
         <ClickableHeaderTitle onClick={handleViewProfile}>

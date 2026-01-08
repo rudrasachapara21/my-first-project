@@ -9,47 +9,102 @@ import MarketActivityChart from './MarketActivityChart';
 
 const Title = styled.h1`
   font-family: 'Clash Display', sans-serif;
-  font-size: 2.5rem;
-  color: ${props => props.theme.textPrimary};
-  margin-bottom: 2rem;
+  font-size: 2.8rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, ${props => props.theme.accentPrimary}, ${props => props.theme.accentSecondary || props.theme.accentPrimary});
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.5rem;
 `;
+
+const Subtitle = styled.p`
+  color: ${props => props.theme.textSecondary};
+  font-size: 1rem;
+  margin-bottom: 2.5rem;
+`;
+
 const StatGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 1.5rem;
 `;
 const StatCard = styled(GlassCard)`
-  padding: 1.5rem;
-  border-radius: 12px;
+  padding: 1.75rem;
+  border-radius: 16px;
   display: flex;
   align-items: center;
+  gap: 1.25rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, ${props => props.theme.accentPrimary}15, transparent);
+    transition: left 0.5s ease;
+  }
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+    border-color: ${props => props.theme.accentPrimary};
+    
+    &::before {
+      left: 100%;
+    }
+  }
 `;
 
 // --- FIX 1: Updated props to use $ prefix (Transient Props) ---
 const StatIcon = styled.div`
-  font-size: 2.5rem;
-  color: ${props => props.$color || props.theme.accentPrimary};
-  margin-right: 1.5rem;
-  padding: 0.8rem;
-  background-color: ${props => props.$bgColor || props.theme.bgSecondary};
-  border-radius: 50%;
+  font-size: 2.8rem;
+  color: ${props => props.$color || props.theme.textMain};
+  padding: 1rem;
+  background: ${props => props.$bgColor || `${props.theme.accentPrimary}15`};
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 4px 12px ${props => props.$bgColor || props.theme.accentPrimary}20;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+  
+  ${props => props.$pulse && `
+    animation: pulse 2s ease-in-out infinite;
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+  `}
 `;
 
-const StatInfo = styled.div``;
+const StatInfo = styled.div`
+  flex: 1;
+`;
+
 const StatValue = styled.p`
-  font-size: 2.2rem;
-  font-weight: 600;
+  font-size: 2.5rem;
+  font-weight: 700;
   color: ${props => props.theme.textPrimary};
   margin: 0;
   line-height: 1;
+  font-family: 'Clash Display', sans-serif;
+  letter-spacing: -0.5px;
 `;
+
 const StatLabel = styled.p`
   color: ${props => props.theme.textSecondary};
-  margin: 0.25rem 0 0 0;
-  font-size: 0.9rem;
+  margin: 0.5rem 0 0 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.3px;
 `;
 
 const MainChartGrid = styled.div`
@@ -101,7 +156,7 @@ const ActivityItem = styled.li`
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid ${props => props.theme.borderColor};
   &:last-child {
     border-bottom: none;
   }
@@ -146,36 +201,37 @@ function AdminDashboard() {
   }, []);
 
   if (isLoading) {
-    return <p>Loading dashboard...</p>;
+    return <p style={{ padding: '2rem', color: 'var(--text-primary)' }}>Loading dashboard...</p>;
   }
 
   return (
     <div>
       <Title>Dashboard</Title>
+      <Subtitle>Overview of platform activity and user statistics</Subtitle>
       <StatGrid>
         <StatCard>
-          <StatIcon><PiUsersThree /></StatIcon>
+          <StatIcon $color="#4f46e5" $pulse><PiUsersThree /></StatIcon>
           <StatInfo>
             <StatValue>{stats?.totalUsers ?? '-'}</StatValue>
             <StatLabel>Total Users</StatLabel>
           </StatInfo>
         </StatCard>
         <StatCard>
-          <StatIcon><PiDiamondsFour /></StatIcon>
+          <StatIcon $color="#0ea5e9" $bgColor="rgba(14, 165, 233, 0.1)"><PiDiamondsFour /></StatIcon>
           <StatInfo>
             <StatValue>{stats?.activeListings ?? '-'}</StatValue>
             <StatLabel>Active Listings</StatLabel>
           </StatInfo>
         </StatCard>
         <StatCard>
-          <StatIcon><PiPaperPlaneTilt /></StatIcon>
+          <StatIcon $color="#8b5cf6" $bgColor="rgba(139, 92, 246, 0.1)"><PiPaperPlaneTilt /></StatIcon>
           <StatInfo>
             <StatValue>{stats?.activeDemands ?? '-'}</StatValue>
             <StatLabel>Active Demands</StatLabel>
           </StatInfo>
         </StatCard>
         <StatCard>
-          <StatIcon><PiNewspaper /></StatIcon>
+          <StatIcon $color="#10b981" $bgColor="rgba(16, 185, 129, 0.1)"><PiNewspaper /></StatIcon>
           <StatInfo>
             <StatValue>{stats?.newsArticles ?? '-'}</StatValue>
             <StatLabel>News Articles</StatLabel>
@@ -188,7 +244,7 @@ function AdminDashboard() {
         
         <StatusCardContainer>
           <StatCard>
-            <StatIcon>
+            <StatIcon $color="#f59e0b" $bgColor="rgba(245, 158, 11, 0.1)">
               <PiHourglass />
             </StatIcon>
             <StatInfo>
@@ -197,7 +253,7 @@ function AdminDashboard() {
             </StatInfo>
           </StatCard>
           <StatCard>
-            <StatIcon>
+            <StatIcon $color="#22c55e" $bgColor="rgba(34, 197, 94, 0.1)">
               <PiCheckCircle />
             </StatIcon>
             <StatInfo>

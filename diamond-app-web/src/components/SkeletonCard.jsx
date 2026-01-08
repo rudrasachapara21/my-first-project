@@ -1,37 +1,80 @@
 import React from 'react';
-// The import for styled-components was missing. It is now fixed.
 import styled, { keyframes } from 'styled-components';
 
+// ✨ Enhanced shimmer animation with smooth wave effect
 const shimmer = keyframes`
-  0% { background-position: -468px 0; }
-  100% { background-position: 468px 0; }
+  0% { 
+    background-position: -1000px 0; 
+  }
+  100% { 
+    background-position: 1000px 0; 
+  }
+`;
+
+// 🎭 Pulse animation for subtle breathing effect
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
 `;
 
 const SkeletonWrapper = styled.div`
   background: ${props => props.theme.bgSecondary};
   border: 1px solid ${props => props.theme.borderColor};
-  border-radius: 16px;
+  border-radius: 20px;
   padding: 1.5rem;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  box-shadow: ${props => props.theme.cardShadow || '0 4px 15px rgba(0,0,0,0.05)'};
+  overflow: hidden;
+  position: relative;
+  
+  /* Subtle breathing effect */
+  animation: ${pulse} 2s ease-in-out infinite;
 `;
 
 const SkeletonLine = styled.div`
   height: ${props => props.$height || '1rem'};
   width: ${props => props.$width || '100%'};
   margin-bottom: ${props => props.$mb || '0.75rem'};
-  border-radius: 8px;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
   
-  background-color: #f6f7f8;
-  background-image: linear-gradient(to right, #eeeeee 0%, #dddddd 20%, #eeeeee 40%, #eeeeee 100%);
+  /* Theme-aware base color */
+  background-color: ${props => props.theme.bgPrimary};
+  
+  /* Beautiful gradient shimmer that adapts to theme */
+  background-image: linear-gradient(
+    90deg,
+    ${props => props.theme.bgPrimary} 0%,
+    ${props => props.theme.borderColor} 20%,
+    ${props => props.theme.accentPrimary}15 40%,
+    ${props => props.theme.borderColor} 60%,
+    ${props => props.theme.bgPrimary} 100%
+  );
   background-repeat: no-repeat;
-  background-size: 800px 104px;
-  animation: ${shimmer} 1.5s linear infinite;
+  background-size: 1000px 100%;
+  animation: ${shimmer} 2s ease-in-out infinite;
+  
+  /* Add subtle inner glow */
+  box-shadow: inset 0 0 10px ${props => props.theme.borderColor};
 `;
 
 const SkeletonImage = styled(SkeletonLine)`
-    height: 250px;
-    width: 100%;
-    margin-bottom: 1rem;
+  height: 250px;
+  width: 100%;
+  margin-bottom: 1rem;
+  border-radius: 16px;
+  
+  /* Enhanced shimmer for images */
+  background-image: linear-gradient(
+    90deg,
+    ${props => props.theme.bgPrimary} 0%,
+    ${props => props.theme.borderColor} 15%,
+    ${props => props.theme.accentPrimary}20 35%,
+    ${props => props.theme.accentPrimary}25 50%,
+    ${props => props.theme.accentPrimary}20 65%,
+    ${props => props.theme.borderColor} 85%,
+    ${props => props.theme.bgPrimary} 100%
+  );
 `;
 
 export function SkeletonListingCard() {

@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "predev": "kill -9 $(lsof -t -i:5001) || true",
     "dev": "nodemon server.js",
     "download:face-models": "node ./scripts/download_face_models.js",
     "db:migrate": "node-pg-migrate up",

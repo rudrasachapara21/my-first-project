@@ -198,8 +198,69 @@ async function sendRejectionEmail({ to, name }) {
   await sendMail({ to, subject, text, html });
 }
 
+async function sendSuspensionEmail({ to, name, reason }) {
+  const subject = '⚠️ Account Suspended - Diamond Connect';
+  const text = `Hi ${name || ''}, Your Diamond Connect account has been suspended.`;
+
+  const html = wrapTemplate(`
+    <h2 style="color: ${DANGER_COLOR}; margin-top: 0; font-size: 22px;">⚠️ Account Suspended</h2>
+    <p style="color: #334155; font-size: 16px;">Hi ${name || 'User'},</p>
+    <p style="color: #334155; font-size: 16px;">Your Diamond Connect account has been <b style="color: ${DANGER_COLOR};">temporarily suspended</b> by our administrative team.</p>
+    ${reason ? `
+    <div style="background-color: #fef2f2; border-left: 4px solid ${DANGER_COLOR}; padding: 15px; margin: 20px 0; border-radius: 6px;">
+      <p style="margin: 0; color: #7f1d1d; font-size: 14px;"><b>Reason:</b></p>
+      <p style="margin: 8px 0 0 0; color: #991b1b; font-size: 15px;">${reason}</p>
+    </div>
+    ` : ''}
+    <p style="color: #334155; font-size: 16px;">During this suspension period:</p>
+    <ul style="color: #475569; font-size: 15px; line-height: 1.8;">
+      <li>You will not be able to access your account</li>
+      <li>All active listings and demands are temporarily hidden</li>
+      <li>You cannot make or receive offers</li>
+    </ul>
+    <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;" />
+    <p style="color: #64748b; font-size: 14px;">If you believe this is a mistake or would like to appeal this decision, please contact our support team immediately.</p>
+  `);
+
+  await sendMail({ to, subject, text, html });
+}
+
+async function sendWarningEmail({ to, name, warning, warnedBy }) {
+  const subject = '⚠️ Warning Notice - Diamond Connect';
+  const text = `Hi ${name || ''}, You have received a warning from Diamond Connect administration.`;
+
+  const html = wrapTemplate(`
+    <h2 style="color: #f59e0b; margin-top: 0; font-size: 22px;">⚠️ Official Warning Notice</h2>
+    <p style="color: #334155; font-size: 16px;">Hi ${name || 'User'},</p>
+    <p style="color: #334155; font-size: 16px;">You have received an <b style="color: #f59e0b;">official warning</b> from the Diamond Connect administrative team.</p>
+    
+    <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 20px; margin: 25px 0; border-radius: 8px;">
+      <p style="margin: 0 0 8px 0; color: #78350f; font-size: 13px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Warning Details</p>
+      <p style="margin: 0; color: #92400e; font-size: 16px; line-height: 1.6;">${warning}</p>
+    </div>
+
+    <div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p style="margin: 0; color: #1e293b; font-size: 14px;"><b>⚡ Important:</b> Repeated violations may result in:</p>
+      <ul style="color: #475569; font-size: 14px; margin: 10px 0 0 0; padding-left: 20px;">
+        <li>Temporary account suspension</li>
+        <li>Permanent account termination</li>
+        <li>Loss of reputation points</li>
+      </ul>
+    </div>
+
+    <p style="color: #334155; font-size: 16px; margin-top: 25px;">We expect all members to maintain professional conduct and adhere to our community guidelines. Please review our <b>Terms of Service</b> and ensure future compliance.</p>
+    
+    <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;" />
+    <p style="color: #64748b; font-size: 13px;">Issued by: ${warnedBy || 'Diamond Connect Admin Team'}</p>
+  `);
+
+  await sendMail({ to, subject, text, html });
+}
+
 module.exports = {
   sendOtpEmail,
   sendApprovalEmail,
   sendRejectionEmail,
+  sendSuspensionEmail,
+  sendWarningEmail,
 };

@@ -108,9 +108,9 @@ const RoleBadge = styled.span`
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: capitalize;
-  background-color: ${props => props.role === 'trader' ? 'rgba(56, 189, 248, 0.1)' : 'rgba(34, 197, 94, 0.1)'};
-  color: ${props => props.role === 'trader' ? '#0284c7' : '#16a34a'};
-  border: 1px solid ${props => props.role === 'trader' ? 'rgba(56, 189, 248, 0.3)' : 'rgba(34, 197, 94, 0.3)'};
+  background-color: ${props => props.role === 'trader' ? 'rgba(14, 165, 233, 0.15)' : 'rgba(16, 185, 129, 0.15)'};
+  color: ${props => props.role === 'trader' ? '#0ea5e9' : '#10b981'};
+  border: 1px solid ${props => props.role === 'trader' ? 'rgba(14, 165, 233, 0.4)' : 'rgba(16, 185, 129, 0.4)'};
 `;
 // --- (End of Styles) ---
 

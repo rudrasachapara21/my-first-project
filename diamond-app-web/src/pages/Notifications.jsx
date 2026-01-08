@@ -107,7 +107,7 @@ function Notifications() {
   };
 
   if (isLoading) {
-    return <div>Loading settings...</div>;
+    return <Container><p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-primary)' }}>Loading settings...</p></Container>;
   }
 
   return (

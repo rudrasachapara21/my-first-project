@@ -58,4 +58,11 @@ router.post('/reject-user', adminController.adminRejectUser);
  */
 router.post('/unverify-user', adminController.unverifyUser);
 
+/**
+ * ✅ NEW: Send warning to user
+ * @desc    Send official warning email to user
+ * @route   POST /api/admin/users/:userId/warn
+ */
+router.post('/users/:userId/warn', adminController.adminWarnUser);
+
 module.exports = router;

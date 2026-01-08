@@ -1,6 +1,6 @@
 import React from 'react';
 import styled, { keyframes, css } from 'styled-components';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
     PiHouse, PiPaperPlaneTilt, PiStorefront, PiTag, PiGear, 
@@ -28,6 +28,7 @@ const SidebarContainer = styled.aside`
     border-right: 1px solid ${props => props.theme.borderColor};
     backdrop-filter: blur(20px) saturate(160%);
     box-sizing: border-box;
+    transition: background-color 0.3s ease;
     
     @media (max-width: 1024px) {
         position: fixed;
@@ -82,23 +83,22 @@ const StyledNavLink = styled(NavLink)`
     font-weight: 500;
     font-size: 0.9rem;
     color: ${props => props.theme.textSecondary};
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Smooth pop effect */
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     border: 1px solid transparent;
 
     svg { 
         font-size: 1.3rem; 
-        transition: all 0.3s ease; /* Allows the icon to rotate smoothly */
+        transition: all 0.3s ease; 
     }
 
-    /* 🚀 3D HOVER EFFECT RESTORED */
     &:hover {
         color: ${props => props.theme.textPrimary};
-        background: ${props => props.theme.textPrimary}0D; /* small translucent highlight */
-        transform: translateX(10px) scale(1.02); /* Slides right and grows slightly */
-        border-color: ${props => props.theme.textPrimary}1A; /* subtle border */
+        background: ${props => props.theme.textPrimary}0D; 
+        transform: translateX(10px) scale(1.02); 
+        border-color: ${props => props.theme.textPrimary}1A; 
         
         svg { 
-            transform: rotate(-12deg) scale(1.25); /* Icon rotates and pops out */
+            transform: rotate(-12deg) scale(1.25); 
             color: ${props => props.theme.accentPrimary};
         }
     }
@@ -157,6 +157,16 @@ const LogoutButton = styled.button`
 
 function Sidebar({ isOpen, onClose }) {
     const { user, logout } = useAuth();
+    const navigate = useNavigate();
+
+    // ✅ SAFETY: Return null if user isn't loaded to prevent crashes 
+    // while the App layout is mounting.
+    if (!user) return null;
+
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
+    };
 
     const traderLinks = [
         { to: "/trader-home", icon: <PiHouse />, label: "Terminal" },
@@ -171,6 +181,8 @@ function Sidebar({ isOpen, onClose }) {
         { to: "/workspace", icon: <PiBriefcase />, label: "Workspace" },
     ];
 
+    const currentLinks = user.role === 'trader' ? traderLinks : brokerLinks;
+
     return (
         <SidebarContainer $isOpen={isOpen}>
             <LogoSection>
@@ -180,7 +192,7 @@ function Sidebar({ isOpen, onClose }) {
 
             <Nav>
                 <SectionLabel>Marketplace</SectionLabel>
-                {(user?.role === 'trader' ? traderLinks : brokerLinks).map(link => (
+                {currentLinks.map(link => (
                     <StyledNavLink to={link.to} key={link.to} onClick={onClose} end>
                         {link.icon} {link.label}
                     </StyledNavLink>
@@ -194,7 +206,7 @@ function Sidebar({ isOpen, onClose }) {
             </Nav>
 
             <SidebarFooter>
-                <LogoutButton onClick={logout}>
+                <LogoutButton onClick={handleLogout}>
                     <PiSignOut weight="bold" /> Sign Out
                 </LogoutButton>
             </SidebarFooter>

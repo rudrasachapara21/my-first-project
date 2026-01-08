@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import styled from 'styled-components';
 import apiClient from '../../api/axiosConfig';
 import { useOutletContext } from 'react-router-dom';
+import InlineLoader from '../../components/InlineLoader';
 
 // --- STYLED COMPONENTS ---
 const Container = styled.div``;
@@ -188,30 +189,36 @@ function ManageUsers() {
 
   const handleRejectUser = async (userId) => {
     if (window.confirm(`Delete this user?`)) {
+        setLoadingUserId(userId);
         try {
             await apiClient.post(`/api/admin/reject-user`, { userId });
             setUsers(prevUsers => prevUsers.filter(u => u.user_id !== userId));
         } catch (error) { console.error(error); }
+        finally { setLoadingUserId(null); }
     }
   };
   
   const handleApproveUser = async (userId) => {
+      setLoadingUserId(userId);
       try {
         await apiClient.post(`/api/admin/approve-user`, { userId });
         setUsers(prevUsers => 
           prevUsers.map(u => u.user_id === userId ? { ...u, is_verified: true } : u)
         );
       } catch (error) { console.error(error); }
+      finally { setLoadingUserId(null); }
   };
 
   const handleUnverifyUser = async (userId) => {
      if (window.confirm(`Un-verify this user?`)) {
+      setLoadingUserId(userId);
       try {
         await apiClient.post(`/api/admin/unverify-user`, { userId });
         setUsers(prevUsers => 
           prevUsers.map(u => u.user_id === userId ? { ...u, is_verified: false } : u)
         );
       } catch (error) { console.error(error); }
+      finally { setLoadingUserId(null); }
     }
   };
 
@@ -234,8 +241,18 @@ function ManageUsers() {
                 <Td data-label="Role" style={{textTransform:'capitalize'}}>{user.role}</Td>
                 <Td data-label="Actions">
                   <ActionsContainer>
-                    <ApproveButton onClick={() => handleApproveUser(user.user_id)}>Approve</ApproveButton>
-                    <RejectButton onClick={() => handleRejectUser(user.user_id)}>Reject</RejectButton>
+                    <ApproveButton 
+                      onClick={() => handleApproveUser(user.user_id)}
+                      disabled={loadingUserId === user.user_id}
+                    >
+                      {loadingUserId === user.user_id ? <InlineLoader size="16px" /> : 'Approve'}
+                    </ApproveButton>
+                    <RejectButton 
+                      onClick={() => handleRejectUser(user.user_id)}
+                      disabled={loadingUserId === user.user_id}
+                    >
+                      {loadingUserId === user.user_id ? <InlineLoader size="16px" /> : 'Reject'}
+                    </RejectButton>
                   </ActionsContainer>
                 </Td>
               </Tr>

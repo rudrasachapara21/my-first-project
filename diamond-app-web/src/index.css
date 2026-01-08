@@ -9,6 +9,8 @@ body {
   padding: 0;
   font-family: 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* Prevent black screen - always have a background */
+  background-color: #0a0a0a;
   /* Smooth background transition when switching themes */
   transition: background-color var(--transition-speed) ease;
   overflow-x: hidden;

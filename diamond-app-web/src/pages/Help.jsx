@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import apiClient from '../api/axiosConfig';
 import PageHeader from '../components/PageHeader';
 import { PiCaretDown } from "react-icons/pi";
+import Toast from '../components/Toast';
 
 const sampleFaqs = [
     {
@@ -53,17 +54,18 @@ const SubmitButton = styled.button`
     color: ${props => props.theme.textMain}; font-family: 'Clash Display', sans-serif;
     font-size: 1.2rem; font-weight: 600; cursor: pointer; &:disabled { background: #ccc; }
 `;
-const ResponseMessage = styled.p`
-    text-align: center; font-weight: 500;
-    color: ${props => props.type === 'success' ? '#22c55e' : '#ef4444'};
-`;
 
 
 function Help() {
     const [openFaq, setOpenFaq] = useState(null);
     const [queryText, setQueryText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [responseMsg, setResponseMsg] = useState({ text: '', type: '' });
+    const [toast, setToast] = useState({ show: false, message: '', type: '' });
+
+    const triggerToast = (msg, type = 'success') => {
+        setToast({ show: true, message: msg, type });
+        setTimeout(() => setToast({ show: false, message: '', type: '' }), 4000);
+    };
 
     const toggleFaq = (index) => {
         setOpenFaq(openFaq === index ? null : index);
@@ -72,19 +74,16 @@ function Help() {
     const handleSubmitQuery = async (e) => {
         e.preventDefault();
         setIsLoading(true);
-        setResponseMsg({ text: '', type: '' });
 
         try {
-            // --- THE FIX: Changed the endpoint from '/api/support/query' to '/api/support' ---
             const response = await apiClient.post('/api/support', { query_text: queryText });
-            setResponseMsg({ text: response.data.message, type: 'success' });
+            triggerToast(response.data.message, 'success');
             setQueryText('');
         } catch (error) {
-            // Use a more specific error message for "Not Found" errors
             const message = error.response?.status === 404
                 ? "Could not find the support endpoint. Please contact the administrator."
                 : error.response?.data?.message || 'An error occurred.';
-            setResponseMsg({ text: message, type: 'error' });
+            triggerToast(message, 'error');
         } finally {
             setIsLoading(false);
         }
@@ -92,6 +91,7 @@ function Help() {
 
     return (
         <Container>
+            <Toast show={toast.show} message={toast.message} type={toast.type} />
             <PageHeader title="Help & Support" />
             <Content>
                 <FaqContainer>
@@ -118,11 +118,6 @@ function Help() {
                         <SubmitButton type="submit" disabled={isLoading || !queryText}>
                             {isLoading ? 'Sending...' : 'Send to Admin'}
                         </SubmitButton>
-                        {responseMsg.text && (
-                            <ResponseMessage type={responseMsg.type}>
-                                {responseMsg.text}
-                            </ResponseMessage>
-                        )}
                     </ContactForm>
                 </div>
             </Content>

@@ -25,6 +25,16 @@ const slideUp = keyframes`
   to { transform: translate(-50%, 0); opacity: 1; }
 `;
 
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
+
+const fadeIn = keyframes`
+  from { opacity: 0; }
+  to { opacity: 1; }
+`;
+
 // --- Styled Components ---
 const Container = styled.div`
   background-color: transparent;
@@ -36,6 +46,43 @@ const Container = styled.div`
       h1 { font-size: 1.6rem; text-align: center; width: 100%; }
     }
   }
+`;
+
+const ScanningOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: ${props => props.theme.bgPrimary}dd;
+  backdrop-filter: blur(20px);
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  animation: ${fadeIn} 0.2s ease-out;
+`;
+
+const ScanningSpinner = styled.div`
+  width: 80px;
+  height: 80px;
+  border: 4px solid ${props => props.theme.borderColor};
+  border-top-color: ${props => props.theme.accentPrimary};
+  border-radius: 50%;
+  animation: ${spin} 1s linear infinite;
+`;
+
+const ScanningText = styled.div`
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: ${props => props.theme.textPrimary};
+  text-align: center;
+`;
+
+const ScanningSubtext = styled.div`
+  font-size: 0.9rem;
+  color: ${props => props.theme.textSecondary};
+  text-align: center;
+  max-width: 300px;
 `;
 
 const FormContainer = styled.form` 
@@ -192,9 +239,9 @@ const StatusOverlay = styled.div`
   border: 1px solid rgba(255,255,255,0.1);
   box-shadow: 0 20px 40px rgba(0,0,0,0.5);
 
-  ${props => props.$type === 'success' && css` background: ${props.theme.success}22; color: ${props.theme.success}; border-color: ${props.theme.success}33; `}
-  ${props => props.$type === 'error' && css` background: ${props.theme.error}22; color: ${props.theme.error}; border-color: ${props.theme.error}33; `}
-  ${props => props.$type === 'info' && css` background: ${props.theme.info}22; color: ${props.theme.info}; border-color: ${props.theme.info}33; `}
+  ${props => props.$type === 'success' && css` background: ${props.theme.accentPrimary}22; color: ${props.theme.accentPrimary}; border-color: ${props.theme.accentPrimary}33; `}
+  ${props => props.$type === 'error' && css` background: ${props.theme.accentSecondary || props.theme.error}22; color: ${props.theme.accentSecondary || props.theme.error}; border-color: ${props.theme.accentSecondary || props.theme.error}33; `}
+  ${props => props.$type === 'info' && css` background: ${props.theme.accentPrimary}22; color: ${props.theme.accentPrimary}; border-color: ${props.theme.accentPrimary}33; `}
 `;
 
 // ✅ NEW THEME-SYNCED BUTTON
@@ -257,6 +304,13 @@ function SellDiamonds() {
     setIsScanning(true);
     triggerStatus("Reading Certificate & Valuating...", "info");
 
+    // Defer API call to allow loading overlay to render first
+    await new Promise(resolve => {
+      requestAnimationFrame(() => {
+        setTimeout(resolve, 50);
+      });
+    });
+
     const formData = new FormData();
     formData.append('pdfFile', certificateFile);
 
@@ -311,6 +365,14 @@ function SellDiamonds() {
 
   return (
     <Container>
+      {isScanning && (
+        <ScanningOverlay>
+          <ScanningSpinner />
+          <ScanningText>Scanning Certificate...</ScanningText>
+          <ScanningSubtext>Reading PDF & Analyzing Diamond Specs</ScanningSubtext>
+        </ScanningOverlay>
+      )}
+
       {status.show && (
         <StatusOverlay $type={status.type}>
           <div style={{ fontSize: '1.2rem' }}>{status.type === 'success' ? '✓' : status.type === 'error' ? '✕' : '✨'}</div>

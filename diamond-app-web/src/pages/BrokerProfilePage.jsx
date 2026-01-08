@@ -8,6 +8,7 @@ import {
     PiChatCircleDots, PiUserPlus, PiXCircle, PiUserMinus, PiCheckCircle, PiCertificate,
     PiMedal, PiStar, PiStarFill, PiStarHalfFill, PiUsers, PiChatText, PiFileText
 } from 'react-icons/pi';
+import Toast from '../components/Toast';
 
 // ## --- IMPORT THE MODAL --- ##
 import ExportStatementModal from '../components/modals/ExportStatementModal';
@@ -369,6 +370,12 @@ function BrokerProfilePage() {
     const [reviewHoverRating, setReviewHoverRating] = useState(0);
     const [reviewText, setReviewText] = useState('');
     const [reviewSubmitting, setReviewSubmitting] = useState(false);
+    const [toast, setToast] = useState({ show: false, message: '', type: '' });
+
+    const triggerToast = (msg, type = 'success') => {
+        setToast({ show: true, message: msg, type });
+        setTimeout(() => setToast({ show: false, message: '', type: '' }), 4000);
+    };
 
     // ## --- STATE FOR EXPORT MODAL --- ##
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -396,28 +403,28 @@ function BrokerProfilePage() {
         fetchProfileAndReviews();
     }, [userId, user]);
 
-    const handleAction = async (action, successMsg, errorMsg, redirectUrl) => { if (!window.confirm("Are you sure?")) return; try { await action(); alert(successMsg); navigate(redirectUrl); } catch (error) { alert(error.response?.data?.message || errorMsg); } };
+    const handleAction = async (action, successMsg, errorMsg, redirectUrl) => { if (!window.confirm("Are you sure?")) return; try { await action(); triggerToast(successMsg, 'success'); navigate(redirectUrl); } catch (error) { triggerToast(error.response?.data?.message || errorMsg, 'error'); } };
     const handleHire = () => handleAction( () => apiClient.post(`/api/demands/${demand.demand_id}/hire/${profile.user_id}`), 'Broker hired successfully!', 'Failed to hire broker.', `/demand/${demand.demand_id}` );
     const handleDismiss = () => handleAction( () => apiClient.delete(`/api/demands/${demand.demand_id}/interest/${profile.user_id}`), 'Broker interest dismissed.', 'Failed to dismiss interest.', `/demand/${demand.demand_id}` );
     const handleUnhire = () => handleAction( () => apiClient.post(`/api/demands/${demand.demand_id}/unhire/${profile.user_id}`), 'Broker has been un-hired.', 'Failed to un-hire broker.', `/demand/${demand.demand_id}` );
-    const handleMessage = async () => { try { const response = await apiClient.post(`/api/conversations`, { recipientId: profile.user_id }); navigate(`/chat/${response.data.conversation_id}`, { state: { partnerName: profile.full_name } }); } catch (error) { alert(error.response?.data?.message || "Could not start conversation."); } };
+    const handleMessage = async () => { try { const response = await apiClient.post(`/api/conversations`, { recipientId: profile.user_id }); navigate(`/chat/${response.data.conversation_id}`, { state: { partnerName: profile.full_name } }); } catch (error) { triggerToast(error.response?.data?.message || "Could not start conversation.", 'error'); } };
 
     const handleCompleteDeal = async () => {
         const confirmMsg = "Are you sure you want to mark this deal as complete? This will award 1 reputation point to the broker and mark the demand as 'completed'.";
         if (window.confirm(confirmMsg)) {
             try {
                 const response = await apiClient.post(`/api/demands/${demand.demand_id}/complete/${profile.user_id}`);
-                alert(response.data.message || 'Deal marked as complete!');
+                triggerToast(response.data.message || 'Deal marked as complete!', 'success');
                 setReviewModalOpen(true);
             } catch (error) {
-                alert(error.response?.data?.message || 'Failed to complete the deal.');
+                triggerToast(error.response?.data?.message || 'Failed to complete the deal.', 'error');
             }
         }
     };
     
     const handleReviewSubmit = async () => {
         if (reviewRating === 0) {
-            alert("Please select a star rating.");
+            triggerToast("Please select a star rating.", 'error');
             return;
         }
         setReviewSubmitting(true);
@@ -428,10 +435,10 @@ function BrokerProfilePage() {
                 rating: reviewRating,
                 review_text: reviewText
             });
-            alert("Review submitted successfully!");
+            triggerToast("Review submitted successfully!", 'success');
             closeReviewModal(true); 
         } catch (error) {
-            alert(error.response?.data?.message || "Failed to submit review.");
+            triggerToast(error.response?.data?.message || "Failed to submit review.", 'error');
         } finally {
             setReviewSubmitting(false);
         }
@@ -458,6 +465,7 @@ function BrokerProfilePage() {
 
     return (
         <Container>
+            <Toast show={toast.show} message={toast.message} type={toast.type} />
             <PageHeader title={`${profile.role === 'broker' ? 'Broker' : 'Trader'} Profile`} backTo={-1} />
             <ProfileWrapper>
                 <ProfileCard>

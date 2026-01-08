@@ -14,7 +14,54 @@ const Container = styled.div`
   background-color: ${props => props.theme.bgPrimary};
   min-height: 100vh;
   /* Extra padding at bottom to ensure last field can scroll above keyboard */
-  padding-bottom: 250px; 
+  padding-bottom: 250px;
+  /* Prevent layout shift during image load */
+  contain: layout style;
+`;
+
+const SavingOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: ${props => props.theme.bgPrimary}dd;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 99999;
+  animation: fadeIn 0.15s ease-out;
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+`;
+
+const SavingSpinner = styled.div`
+  width: 80px;
+  height: 80px;
+  border: 5px solid ${props => props.theme.borderColor};
+  border-top-color: ${props => props.theme.accentPrimary};
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+`;
+
+const SavingText = styled.div`
+  color: ${props => props.theme.textPrimary};
+  font-size: 1.3rem;
+  font-weight: 700;
+  text-align: center;
+`;
+
+const SavingSubtext = styled.div`
+  color: ${props => props.theme.textSecondary};
+  font-size: 1rem;
+  text-align: center;
+  max-width: 320px;
+  line-height: 1.5;
 `;
 
 const ProfilePhotoSection = styled.div` 
@@ -29,14 +76,51 @@ const AvatarWrapper = styled.div`
   margin-bottom: 1.5rem;
 `;
 
+const PhotoLoadingOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 10;
+`;
+
+const LoadingSpinner = styled.div`
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255,255,255,0.3);
+  border-top-color: ${props => props.theme.accentPrimary};
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+`;
+
+const LoadingText = styled.div`
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+`;
+
 const Avatar = styled.img` 
   width: 110px; 
   height: 110px; 
   border-radius: 50%; 
-  background-color: ${props => props.theme.bgSecondary}; 
+  background: linear-gradient(135deg, ${props => props.theme.bgSecondary}, ${props => props.theme.bgPrimary}); 
   border: 4px solid ${props => props.theme.bgSecondary}; 
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   object-fit: cover;
+  display: block;
+  opacity: ${props => props.$loading ? 0.5 : 1};
+  transition: opacity 0.2s ease;
+  /* Optimize rendering performance */
+  will-change: opacity;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 `;
 
 // ✅ FIX: Custom styled photo trigger to match professional theme
@@ -208,6 +292,7 @@ function EditProfile() {
   const [photoPreview, setPhotoPreview] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [success, setSuccess] = useState('');
   const [uploadError, setUploadError] = useState('');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -242,11 +327,33 @@ function EditProfile() {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setPhotoFile(file);
       setUploadError('');
-      const reader = new FileReader();
-      reader.onloadend = () => { setPhotoPreview(reader.result); };
-      reader.readAsDataURL(file);
+      
+      // Use requestAnimationFrame to ensure UI updates before FileReader starts
+      requestAnimationFrame(() => {
+        setIsUploadingPhoto(true);
+        
+        // Small delay to ensure loading overlay is painted
+        setTimeout(() => {
+          const reader = new FileReader();
+          
+          reader.onloadend = () => { 
+            // Only update after successful read
+            if (reader.result) {
+              setPhotoFile(file);
+              setPhotoPreview(reader.result);
+            }
+            setIsUploadingPhoto(false);
+          };
+          
+          reader.onerror = () => {
+            setUploadError('Failed to load image');
+            setIsUploadingPhoto(false);
+          };
+          
+          reader.readAsDataURL(file);
+        }, 50); // 50ms delay ensures overlay is visible
+      });
     }
   };
 
@@ -300,12 +407,45 @@ function EditProfile() {
                        `https://ui-avatars.com/api/?name=${profile.full_name.replace(' ', '+')}`;
 
   return (
-    <Container>
-      <PageHeader title="Edit Profile" />
+    <>
+      {isSaving && (
+        <SavingOverlay>
+          <SavingSpinner />
+          <SavingText>
+            {photoFile ? 'Verifying Face...' : 'Saving Changes...'}
+          </SavingText>
+          {photoFile && (
+            <SavingSubtext>
+              This may take a few seconds while we validate your photo
+            </SavingSubtext>
+          )}
+        </SavingOverlay>
+      )}
+
+      <Container>
+        <PageHeader title="Edit Profile" />
       
       <ProfilePhotoSection>
         <AvatarWrapper>
-          <Avatar src={displayImage} alt="Profile" />
+          <Avatar 
+            src={displayImage} 
+            alt="Profile" 
+            $loading={isUploadingPhoto}
+            decoding="async"
+            loading="eager"
+            onError={(e) => {
+              // Fallback to UI Avatars if image fails to load
+              if (!e.target.src.includes('ui-avatars.com')) {
+                e.target.src = `https://ui-avatars.com/api/?name=${profile.full_name.replace(' ', '+')}`;
+              }
+            }}
+          />
+          {isUploadingPhoto && (
+            <PhotoLoadingOverlay>
+              <LoadingSpinner />
+              <LoadingText>Loading...</LoadingText>
+            </PhotoLoadingOverlay>
+          )}
           <ChangePhotoTrigger htmlFor="photo-upload">
             <PiCameraBold size={20} />
           </ChangePhotoTrigger>
@@ -393,6 +533,7 @@ function EditProfile() {
         onClose={() => setIsExportModalOpen(false)} 
       />
     </Container>
+    </>
   );
 }
 

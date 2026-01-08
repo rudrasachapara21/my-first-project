@@ -5,6 +5,7 @@ import apiClient from '../api/axiosConfig';
 import PageHeader from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { PiCheckCircle, PiCurrencyInr, PiXCircle } from "react-icons/pi";
+import Toast from '../components/Toast';
 
 // --- Styles ---
 const Container = styled.div``;
@@ -194,7 +195,7 @@ function ListingOffersPage() {
             // Just refresh data, don't use annoying alerts
             fetchOffers(); 
         } catch (error) { 
-            alert(error.response?.data?.message || `Failed to ${responseType} offer.`); 
+            triggerToast(error.response?.data?.message || `Failed to ${responseType} offer.`, 'error'); 
         } finally {
             setIsSubmitting(false);
         }
@@ -208,7 +209,7 @@ function ListingOffersPage() {
     
     const onCounterModalSubmit = () => {
         if (!newCounterPrice || isNaN(newCounterPrice) || newCounterPrice <= 0) {
-            alert('Please enter a valid price.');
+            triggerToast('Please enter a valid price.', 'error');
             return;
         }
         handleResponse(currentOffer.offer_id, 'counter', newCounterPrice);
@@ -219,6 +220,7 @@ function ListingOffersPage() {
 
     return (
         <Container>
+            <Toast show={toast.show} message={toast.message} type={toast.type} />
             <PageHeader title="Manage Offers" backTo={-1} />
             
             {/* --- SUCCESS BANNER (If Sold) --- */}

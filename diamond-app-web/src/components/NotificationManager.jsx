@@ -1,75 +1,50 @@
 import React, { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import toast, { Toaster } from 'react-hot-toast';
 import io from 'socket.io-client';
 
-const NOTIFICATION_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'; 
+const NOTIFICATION_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
 
 const NotificationManager = () => {
   const { user } = useAuth();
-  const { currentTheme } = useTheme() || {};
 
   useEffect(() => {
     if (!user) return;
 
-    // ✅ FIX: Force WebSocket transport to prevent 400 Bad Request (Polling) errors
-    const socket = io('http://localhost:5001', {
-      transports: ['websocket'], 
+    // Connect to WebSocket with environment-aware URL
+    const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace('/api', '');
+    const socket = io(SOCKET_URL, {
+      transports: ['websocket'],
       upgrade: false,
       reconnectionAttempts: 5
     });
 
-    // Logging connection for debugging
     socket.on('connect', () => {
-      console.log("🚀 Premium System Connected to Real-time Engine");
+      console.log("🔌 Connected to Notification Service");
       socket.emit('join_room', user.user_id || user.id);
     });
 
-    socket.on('receive_message', (data) => {
-      if (data.sender_id === (user.user_id || user.id)) return;
-      playSound();
-
-      toast((t) => (
-        <div style={{ minWidth: '220px' }}>
-            <div style={{ fontWeight: '700', color: currentTheme?.textPrimary, marginBottom: '4px' }}>
-               New Message
-            </div>
-            <div style={{ fontSize: '0.85rem', color: currentTheme?.textSecondary }}>
-               {data.message.substring(0, 45)}{data.message.length > 45 ? '...' : ''}
-            </div>
-        </div>
-      ), {
-        duration: 5000,
-        position: 'top-right',
-        style: {
-          background: currentTheme?.surfaceGlass || currentTheme?.bgSecondary,
-          borderRadius: '12px',
-          borderLeft: `5px solid ${currentTheme?.accentPrimary}`,
-          padding: '16px',
-          boxShadow: `${currentTheme?.primaryGlow || ''}, ${currentTheme?.cardShadow || ''}`,
-          border: currentTheme?.glassBorder
-        },
-      });
-    });
-
-    socket.on('new_notification', (data) => {
-        playSound();
-        toast.success(data.message, {
-            position: 'bottom-right',
-            duration: 5000,
-            style: {
-              borderRadius: '12px',
-              background: currentTheme?.surfaceGlass || currentTheme?.bgSecondary,
-              color: currentTheme?.textPrimary,
-              boxShadow: `${currentTheme?.primaryGlow || ''}, ${currentTheme?.cardShadow || ''}`,
-              border: currentTheme?.glassBorder
-            }
-        });
-    });
-
     socket.on('connect_error', (err) => {
-      console.error("❌ Connection Sync Error:", err.message);
+      console.error("Socket connection error:", err);
+    });
+
+    // Play notification sound
+    const playNotificationSound = () => {
+      const audio = new Audio(NOTIFICATION_SOUND_URL);
+      audio.volume = 0.5;
+      audio.play().catch(err => console.log("Audio blocked:", err));
+    };
+
+    // Handle incoming notifications
+    socket.on('notification', (data) => {
+      console.log("🔔 Notification:", data);
+      playNotificationSound();
+
+      toast(data.message || 'New notification', {
+        icon: '💎',
+        duration: 4000,
+        position: 'top-right',
+      });
     });
 
     return () => {
@@ -77,52 +52,92 @@ const NotificationManager = () => {
     };
   }, [user]);
 
-  const playSound = () => {
-    try {
-        const audio = new Audio(NOTIFICATION_SOUND_URL);
-        audio.volume = 0.4; 
-        audio.play().catch(() => {}); 
-    } catch (err) {}
-  };
-
   return (
     <Toaster
+      position="top-right"
       toastOptions={{
-        // Default options applied to all toasts; individual toasts can override
-        position: 'top-right',
+        className: '',
         duration: 4000,
+        
+        // --- AGGRESSIVE GLASS STYLING (FORCE VISIBILITY) ---
         style: {
-          background: currentTheme?.bgSecondary,
-          color: currentTheme?.textPrimary,
-          borderRadius: '12px',
-          boxShadow: currentTheme?.cardShadow
-        }
-        ,
+          // DARK GLASS BACKGROUND
+          background: 'rgba(20, 20, 30, 0.95)',
+          color: '#ffffff',
+          
+          // GLASS EFFECT
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          
+          // PREMIUM BORDER
+          border: '1px solid rgba(255, 215, 0, 0.3)',
+          borderRadius: '16px',
+          
+          // STRONG SHADOW
+          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 215, 0, 0.15)',
+          
+          // SPACING
+          padding: '16px 20px',
+          minWidth: '300px',
+          maxWidth: '400px',
+          
+          // FONT
+          fontFamily: "'Inter', -apple-system, sans-serif",
+          fontSize: '0.95rem',
+          fontWeight: '500',
+          lineHeight: '1.5',
+        },
+        
+        // --- SUCCESS VARIANT ---
         success: {
           style: {
-            background: currentTheme?.surfaceGlass || currentTheme?.bgSecondary,
-            color: currentTheme?.textPrimary,
-            borderLeft: `5px solid ${currentTheme?.success}`,
-            boxShadow: `${currentTheme?.primaryGlow || ''}, ${currentTheme?.cardShadow || ''}`,
-            border: currentTheme?.glassBorder
-          }
+            background: 'rgba(16, 185, 129, 0.15)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            borderLeft: '4px solid #10B981',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(16, 185, 129, 0.3)',
+            color: '#ffffff',
+          },
+          iconTheme: {
+            primary: '#10B981',
+            secondary: '#ffffff',
+          },
         },
+        
+        // --- ERROR VARIANT ---
         error: {
           style: {
-            background: currentTheme?.bgSecondary,
-            color: currentTheme?.textPrimary,
-            borderLeft: `5px solid ${currentTheme?.error}`,
-            boxShadow: currentTheme?.cardShadow
-          }
+            background: 'rgba(239, 68, 68, 0.15)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            borderLeft: '4px solid #EF4444',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(239, 68, 68, 0.3)',
+            color: '#ffffff',
+          },
+          iconTheme: {
+            primary: '#EF4444',
+            secondary: '#ffffff',
+          },
         },
+        
+        // --- LOADING VARIANT ---
         loading: {
           style: {
-            background: currentTheme?.bgSecondary,
-            color: currentTheme?.textPrimary,
-            borderLeft: `5px solid ${currentTheme?.info}`,
-            boxShadow: currentTheme?.cardShadow
-          }
-        }
+            background: 'rgba(59, 130, 246, 0.15)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(59, 130, 246, 0.4)',
+            borderLeft: '4px solid #3B82F6',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(59, 130, 246, 0.3)',
+            color: '#ffffff',
+          },
+          iconTheme: {
+            primary: '#3B82F6',
+            secondary: '#ffffff',
+          },
+        },
       }}
     />
   );

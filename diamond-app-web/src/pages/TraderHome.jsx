@@ -8,7 +8,11 @@ import { useAuth } from '../context/AuthContext';
 import AppHeader from '../components/AppHeader';
 import DashboardSummary from '../components/DashboardSummary';
 
-const Container = styled.div`font-family: 'Inter', sans-serif;`;
+const Container = styled.div`
+  font-family: 'Inter', sans-serif;
+  background-color: ${props => props.theme.bgPrimary};
+  min-height: 100%;
+`;
 
 const NavGrid = styled.main`
   display: flex;
@@ -25,7 +29,8 @@ const NavCard = styled(GlassCard)`
   cursor: pointer;
   display: flex;
   align-items: center;
-  transition: transform 0.1s ease-in-out;
+  transition: transform 0.1s ease-in-out, background-color 0.3s ease;
+  border: 1px solid ${props => props.theme.borderColor};
   
   &:active { transform: scale(0.97); }
 
@@ -39,6 +44,9 @@ const IconWrapper = styled.div`
   margin-right: 1.25rem;
   width: 30px;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   
   @media (max-width: 480px) {
     font-size: 1.5rem;
@@ -59,38 +67,54 @@ function TraderHome() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [summaryStats, setSummaryStats] = useState(null);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
+    // ✅ SAFETY: Do not attempt fetch if user is not yet defined
     if (!user) return;
+
     const fetchStats = async () => {
         try {
-            // ## CHANGE: Using apiClient and added /api prefix ##
+            setLoading(true);
             const response = await apiClient.get('/api/stats/summary');
             setSummaryStats(response.data);
         } catch (error) {
             console.error("Failed to fetch trader stats:", error);
+        } finally {
+            setLoading(false);
         }
     };
+
     fetchStats();
   }, [user]);
 
+  // ✅ PREVENT CRASH: If user object is missing, show nothing or a small loader
+  // This works with ProtectedRoute to ensure we never see a "broken" UI
+  if (!user) return null;
+
   return (
     <Container>
-      <AppHeader title="Home" />
-      <DashboardSummary stats={summaryStats} />
+      <AppHeader title={`Welcome, ${user.firstName || 'Trader'}`} />
+      
+      {/* DashboardSummary should handle its own loading state based on stats being null */}
+      <DashboardSummary stats={summaryStats} isLoading={loading} />
+      
       <NavGrid>
         <NavCard $primary onClick={() => navigate('/my-demands')}>
             <IconWrapper><PiPlusCircle /></IconWrapper>
             <NavCardTitle>Post a Demand</NavCardTitle>
         </NavCard>
-        <NavCard onClick={() => navigate('/my-demands')}>
+        
+        <NavCard onClick={() => navigate('/view-demands')}>
             <IconWrapper><PiBinoculars /></IconWrapper>
-            <NavCardTitle>My Demands</NavCardTitle>
+            <NavCardTitle>Browse Demands</NavCardTitle>
         </NavCard>
+        
         <NavCard onClick={() => navigate('/buy-feed')}>
             <IconWrapper><PiStorefront /></IconWrapper>
             <NavCardTitle>Buy Feed</NavCardTitle>
         </NavCard>
+        
         <NavCard onClick={() => navigate('/sell-diamonds')}>
             <IconWrapper><PiTag /></IconWrapper>
             <NavCardTitle>My Listings</NavCardTitle>

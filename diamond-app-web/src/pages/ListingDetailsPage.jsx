@@ -5,8 +5,7 @@ import apiClient from '../api/axiosConfig';
 import PageHeader from '../components/PageHeader';
 import Loader from '../components/Loader';
 import { useAuth } from '../context/AuthContext';
-// ✅ ADDED: Professional toast system
-import toast, { Toaster } from 'react-hot-toast'; 
+import Toast from '../components/Toast'; 
 
 import { 
     PiCertificate, PiChatCircleDots, PiMapPinLine, PiPhone, 
@@ -246,6 +245,7 @@ function ListingDetailsPage() {
     const { user } = useAuth();
     const [listing, setListing] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [toast, setToast] = useState({ show: false, message: '', type: '' });
     
     // UI Logic States (PRESERVED)
     const [isOfferModalOpen, setOfferModalOpen] = useState(false);
@@ -261,6 +261,11 @@ function ListingDetailsPage() {
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', action: null });
     
     const API_ROOT_URL = (import.meta.env.VITE_API_URL || '').replace('/api', '');
+
+    const triggerToast = (msg, type = 'success') => {
+        setToast({ show: true, message: msg, type });
+        setTimeout(() => setToast({ show: false, message: '', type: '' }), 4000);
+    };
 
     const openConfirm = (title, message, action) => {
         setConfirmModal({ isOpen: true, title, message, action });
@@ -296,19 +301,19 @@ function ListingDetailsPage() {
             const recipientId = listing.user_id || listing.trader_id;
             const response = await apiClient.post(`/api/conversations`, { recipientId });
             navigate(`/chat/${response.data.conversation_id}`, { state: { partnerName: listing.full_name, partnerId: recipientId } });
-        } catch (error) { toast.error("Could not start conversation."); }
+        } catch (error) { triggerToast("Could not start conversation.", 'error'); }
     };
     
     const handleMakeOffer = async () => {
-        if (!offerPrice || isNaN(offerPrice) || offerPrice <= 0) { toast.error('Please enter a valid price.'); return; }
+        if (!offerPrice || isNaN(offerPrice) || offerPrice <= 0) { triggerToast('Please enter a valid price.', 'error'); return; }
         setIsSubmitting(true);
-        const loadToast = toast.loading('Sending offer...');
+        triggerToast('Sending offer...', 'info');
         try {
             await apiClient.post(`/api/offers/${listingId}`, { offer_price: offerPrice });
             setOfferModalOpen(false);
             setOfferPrice('');
-            toast.success('Offer Sent Successfully!', { id: loadToast });
-        } catch (error) { toast.error('Failed to send offer.', { id: loadToast }); } 
+            triggerToast('Offer Sent Successfully!', 'success');
+        } catch (error) { triggerToast('Failed to send offer.', 'error'); } 
         finally { setIsSubmitting(false); }
     };
 
@@ -318,7 +323,7 @@ function ListingDetailsPage() {
             "This action cannot be undone. The listing will be permanently removed.",
             async () => {
                 try { await apiClient.delete(`/api/listings/${listingId}`); navigate('/buy-feed'); } 
-                catch (error) { toast.error('Failed to delete.'); }
+                catch (error) { triggerToast('Failed to delete.', 'error'); }
             }
         );
     };
@@ -328,8 +333,8 @@ function ListingDetailsPage() {
             "Mark as Sold?",
             "Confirm that the deal is complete and payment has been received.",
             async () => {
-                try { await apiClient.put(`/api/listings/${listingId}/sold`); fetchListing(); toast.success('Marked as Sold'); } 
-                catch (error) { toast.error("Failed to mark sold."); }
+                try { await apiClient.put(`/api/listings/${listingId}/sold`); fetchListing(); triggerToast('Marked as Sold', 'success'); } 
+                catch (error) { triggerToast("Failed to mark sold.", 'error'); }
             }
         );
     };
@@ -339,8 +344,8 @@ function ListingDetailsPage() {
             "Reactivate Listing?",
             "This will cancel the pending status and make the diamond visible to buyers again.",
             async () => {
-                try { await apiClient.put(`/api/listings/${listingId}/reactivate`); fetchListing(); toast.success('Listing Reactivated'); } 
-                catch (error) { toast.error("Failed to reactivate."); }
+                try { await apiClient.put(`/api/listings/${listingId}/reactivate`); fetchListing(); triggerToast('Listing Reactivated', 'success'); } 
+                catch (error) { triggerToast("Failed to reactivate.", 'error'); }
             }
         );
     };
@@ -373,6 +378,7 @@ function ListingDetailsPage() {
         if (url.startsWith('http')) return url;
         return `${API_ROOT_URL}${url.startsWith('/') ? url : '/' + url}`;
     });
+
     if (images.length === 0) images.push('https://placehold.co/800x600?text=No+Image');
 
     const handleNext = (e) => { e.stopPropagation(); setCurrentImgIndex(p => p < images.length - 1 ? p + 1 : p); };
@@ -390,8 +396,7 @@ function ListingDetailsPage() {
 
     return (
         <PageContainer>
-            {/* ✅ Professional Toaster */}
-            <Toaster position="top-center" reverseOrder={false} />
+            <Toast show={toast.show} message={toast.message} type={toast.type} />
 
             <div style={{ flexShrink: 0 }}>
                 <PageHeader title={listing.title || `${listing.carat}ct ${listing.shape}`} backTo={-1} />

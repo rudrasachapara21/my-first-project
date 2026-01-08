@@ -122,7 +122,7 @@ function NewsDetailPage() {
     fetchArticle();
   }, [id]);
 
-  if (loading) return <Container>Loading article...</Container>;
+  if (loading) return <Container><p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-primary)' }}>Loading article...</p></Container>;
   if (!article) return <Container>Article not found.</Container>;
 
   // Logic to handle image URL
