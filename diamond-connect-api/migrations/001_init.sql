@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS public.listings (
     diamond_details JSONB NOT NULL,
     certificate_url TEXT,
     price NUMERIC(12, 2),
-    status VARCHAR(50) DEFAULT 'available',
+    status VARCHAR(50) DEFAULT 'active',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     image_urls TEXT[]
 );

@@ -37,9 +37,13 @@ exports.createUser = async (req, res, next) => {
 
 exports.getAllUsers = async (req, res, next) => {
     try {
+        // Only return users who have verified their email via OTP
+        // Unverified OTP users should NOT appear in admin panel
         const query = `
-            SELECT user_id, full_name, email, phone_number, office_name, role, is_verified
-            FROM users WHERE role != 'admin' ORDER BY created_at DESC
+            SELECT user_id, full_name, email, phone_number, office_name, role, is_verified, email_verified
+            FROM users 
+            WHERE role != 'admin' AND email_verified = TRUE
+            ORDER BY created_at DESC
         `;
         const { rows } = await db.query(query);
         res.json(rows);

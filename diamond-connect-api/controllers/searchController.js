@@ -20,7 +20,7 @@ exports.searchMarketplace = async (req, res, next) => {
         const listingsQuery = `
             SELECT listing_id, title, price, image_urls, status, created_at
             FROM listings
-            WHERE (title ILIKE $1 OR diamond_details::text ILIKE $1) AND status = 'available'
+            WHERE (title ILIKE $1 OR diamond_details::text ILIKE $1) AND status = 'active'
             ORDER BY created_at DESC
             LIMIT 20;
         `;

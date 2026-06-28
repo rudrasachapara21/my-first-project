@@ -322,20 +322,30 @@ function AdminLayout() {
   const [users, setUsers] = useState([]);
   const [news, setNews] = useState([]);
   const [isMobileNavOpen, setMobileNavOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const { user, logout } = useAuth();
   
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
     const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
         const [usersResponse, newsResponse] = await Promise.all([
           apiClient.get('/api/users'),
           apiClient.get('/api/news')
         ]);
-        setUsers(usersResponse.data);
-        setNews(newsResponse.data);
+        setUsers(usersResponse.data || []);
+        setNews(newsResponse.data || []);
       } catch (error) {
         console.error("Failed to fetch admin data:", error);
+        setError(error.response?.data?.message || 'Failed to load admin data');
+        // Set empty arrays on error to prevent crashes
+        setUsers([]);
+        setNews([]);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchData();
@@ -387,7 +397,7 @@ function AdminLayout() {
           <MobileTitle>Admin Panel</MobileTitle>
           <div style={{width: '24px'}}></div>
         </MobileHeader>
-        <Outlet context={{ users, setUsers, news, setNews }} />
+        <Outlet context={{ users, setUsers, news, setNews, isLoading, error }} />
       </MainContent>
     </AdminWrapper>
   );

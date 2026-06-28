@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import './index.css';
 import styled from 'styled-components'; 
+import AuthPage from './pages/AuthPage';
 
 import { ThemeProvider, useTheme } from './context/ThemeContext'; 
 import { AuthProvider, useAuth } from './context/AuthContext'; 
@@ -63,8 +64,8 @@ const AppRoutes = () => {
     <>
       <Routes>
         {/* --- PUBLIC ROUTES --- */}
-        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+        <Route path="/login" element={<PublicRoute><AuthPage /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><AuthPage /></PublicRoute>} />
         <Route path="/admin/login" element={<PublicRoute><AdminLogin /></PublicRoute>} />
         <Route path="/verify-email" element={<PublicRoute><VerifyEmail /></PublicRoute>} />
 

@@ -106,6 +106,16 @@ exports.login = async (req, res, next) => {
             }
         });
     } catch (error) {
+        // Database connection errors (macOS Postgres auth dialog issue)
+        if (error.code === 'XX000' || error.code === '57P03' || error.message?.includes('auth_permission_dialog')) {
+            console.error('🔴 CRITICAL DATABASE ERROR - macOS Postgres Socket Issue:', error.message);
+            console.error('💡 FIX: Update DATABASE_URL to use 127.0.0.1 instead of localhost');
+            return res.status(503).json({ 
+                message: 'Database connection failed. Please check server configuration.',
+                hint: 'Server needs to use 127.0.0.1 instead of localhost for macOS Postgres'
+            });
+        }
+        
         console.error("Login error:", error);
         next(error);
     }

@@ -262,6 +262,12 @@ function ChatWindowPage() {
   const [newMessage, setNewMessage] = useState('');
   const [partnerId, setPartnerId] = useState(location.state?.partnerId || null);
   const [partnerName, setPartnerName] = useState(location.state?.partnerName || 'Chat');
+  const [toast, setToast] = useState({ show: false, message: '', type: '' });
+  
+  const showToast = (message, type = 'info') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: '' }), 4000);
+  };
   
   const messageAreaRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -330,7 +336,9 @@ function ChatWindowPage() {
     const formData = new FormData();
     formData.append('document', file);
     try {
-      await apiClient.post(`/api/conversations/${conversationId}/documents`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await apiClient.post(`/api/conversations/${conversationId}/documents`, formData, { 
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
     } catch (error) { alert('Failed to upload file.'); } 
     finally { e.target.value = null; setIsUploading(false); }
   };

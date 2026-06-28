@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { showLoader, hideLoader } from '../utils/loaderService';
 
 // AUTO-DETECT: Uses localhost when testing, and Render when built.
 const BASE_URL = import.meta.env.VITE_API_URL || 'https://diamond-connect-backend.onrender.com';
@@ -10,9 +9,6 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
     (config) => {
-        // Start global loader for all requests
-        try { showLoader(); } catch (e) { /* ignore */ }
-        
         const token = localStorage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
@@ -24,12 +20,9 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
     (response) => {
-        try { hideLoader(); } catch (e) { /* ignore */ }
         return response;
     },
     async (error) => {
-        // Hide loader for errors
-        try { hideLoader(); } catch (e) { /* ignore */ }
         
         const originalRequest = error.config;
 

@@ -10,13 +10,23 @@ const config = {
   connectionString: process.env.DATABASE_URL,
 };
 
-// ## --- THIS IS THE FIX --- ##
-// Instead of checking NODE_ENV, we check if the URL is a Supabase URL.
-// Supabase requires SSL.
+// ## --- SSL & CONNECTION FIX --- ##
+// Supabase requires SSL
 if (process.env.DATABASE_URL.includes('supabase.co')) {
   config.ssl = {
     rejectUnauthorized: false,
   };
+}
+// Local development: Force TCP connection (not Unix socket) to avoid macOS auth dialog bug
+else if (process.env.DATABASE_URL.includes('localhost')) {
+  // Replace localhost with 127.0.0.1 to force TCP connection
+  config.connectionString = process.env.DATABASE_URL.replace('localhost', '127.0.0.1');
+  config.ssl = false;
+  console.log('🔧 macOS Fix Applied: Using 127.0.0.1 (TCP) instead of localhost (Unix socket)');
+}
+else {
+  // Other local connections
+  config.ssl = false;
 }
 // ## --- END OF FIX --- ##
 

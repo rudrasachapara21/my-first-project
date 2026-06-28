@@ -8,6 +8,7 @@ const { sendApprovalEmail, sendRejectionEmail, sendSuspensionEmail, sendWarningE
  */
 exports.adminGetAllUsers = async (req, res, next) => {
     try {
+        // Only return users who have verified their email via OTP
         const query = `
             SELECT 
                 user_id, 
@@ -16,9 +17,10 @@ exports.adminGetAllUsers = async (req, res, next) => {
                 profile_photo_url,
                 role,
                 is_verified,
-                is_suspended
+                is_suspended,
+                email_verified
             FROM users 
-            WHERE role != 'admin' 
+            WHERE role != 'admin' AND email_verified = TRUE
             ORDER BY full_name ASC
         `;
         const { rows } = await db.query(query);
@@ -179,7 +181,7 @@ exports.adminGetUserActivity = async (req, res, next) => {
         res.status(200).json({
             liveDemands: formatList(demandsResult.rows.filter(d => d.status === 'active')),
             completedDemands: formatList(demandsResult.rows.filter(d => d.status === 'completed')),
-            currentListings: formatList(listingsResult.rows.filter(l => l.status === 'active' || l.status === 'available')),
+            currentListings: formatList(listingsResult.rows.filter(l => l.status === 'active')),
             soldListings: formatList(listingsResult.rows.filter(l => l.status === 'sold')),
             offersMade: formatList(offersMadeResult.rows),
             offersReceived: formatList(offersReceivedResult.rows),
